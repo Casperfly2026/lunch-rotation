@@ -556,12 +556,21 @@
     .catch(function(err) { if (callback) callback(err, null); });
   }
 
+  // Local date helper (avoids UTC timezone issues with toISOString)
+  function getLocalDateStr() {
+    var d = new Date();
+    var m = d.getMonth() + 1;
+    var day = d.getDate();
+    return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+  }
+
   // Load all data from Firebase
-  function loadAllData() {
+  function loadAllData(callback) {
     fbGet("", function(err, data) {
       if (err) {
         statusEl.textContent = "Offline - using local cache";
         statusEl.className = "sync-status disconnected";
+        if (callback) callback();
         return;
       }
 
@@ -588,6 +597,7 @@
       }
 
       onDataChanged();
+      if (callback) callback();
     });
   }
 
@@ -946,23 +956,24 @@
     };
 
     fbPost("lunches", lunchData, function() {
-      loadAllData();
+      // Reload data first so suggestion updates with new entry
+      loadAllData(function() {
+        // Reset form AFTER data is reloaded
+        document.getElementById("lunch-date").value = getLocalDateStr();
+        document.getElementById("lunch-place").value = "";
+        document.getElementById("payer").value = "";
+        document.getElementById("driver").value = "";
+        document.getElementById("bulk-total").value = "";
+        document.getElementById("bulk-tax").value = "";
+        document.getElementById("bulk-tips").value = "";
+        orderMembers = [];
+        populateOrdererDropdown();
+        document.getElementById("grand-total").textContent = "$0.00";
+        document.getElementById("order-total").textContent = "$0.00";
+        renderOrders();
+        alert("Lunch saved!");
+      });
     });
-
-    // Reset everything for next entry
-    document.getElementById("lunch-date").value = new Date().toISOString().split("T")[0];
-    document.getElementById("lunch-place").value = "";
-    document.getElementById("payer").value = "";
-    document.getElementById("driver").value = "";
-    document.getElementById("bulk-total").value = "";
-    document.getElementById("bulk-tax").value = "";
-    document.getElementById("bulk-tips").value = "";
-    orderMembers = [];
-    populateOrdererDropdown();
-    document.getElementById("grand-total").textContent = "$0.00";
-    document.getElementById("order-total").textContent = "$0.00";
-    renderOrders();
-    alert("Lunch saved!");
   }
 
   // Delete lunch
@@ -1152,7 +1163,7 @@
 
   // Init
   buildTabs();
-  document.getElementById("lunch-date").value = new Date().toISOString().split("T")[0];
+  document.getElementById("lunch-date").value = getLocalDateStr();
 
   document.getElementById("btn-add-member").addEventListener("click", function() {
     addMember();
