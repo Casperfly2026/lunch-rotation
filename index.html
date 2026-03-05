@@ -131,31 +131,7 @@
   .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
   .inline-form { display: flex; gap: 8px; align-items: end; }
   .inline-form .field { flex: 1; }
-  .member-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .member-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--primary-bg);
-    color: var(--primary);
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 500;
-  }
-  .member-chip .remove {
-    cursor: pointer;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(79,70,229,0.15);
-    font-size: 0.75rem;
-    line-height: 1;
-  }
-  .member-chip .remove:hover { background: var(--danger); color: white; }
+  .member-list { margin-top: 12px; }
   .member-card {
     background: var(--gray-50);
     border-radius: 8px;
@@ -308,7 +284,6 @@
   }
   .delete-btn:hover { color: var(--danger); background: var(--danger-bg); }
   .hidden { display: none; }
-  .loading { text-align: center; padding: 40px; color: var(--gray-400); }
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
     .order-entry { grid-template-columns: auto 1fr; }
@@ -396,77 +371,103 @@
   </div>
 </div>
 
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 <script>
 (function() {
   "use strict";
 
-  // Firebase config
-  var firebaseConfig = {
-    databaseURL: "https://lunch-rotation-9c174-default-rtdb.firebaseio.com",
-    projectId: "lunch-rotation-9c174",
-    appId: "1:108583375577:web:49faf7706fa71d2a2724c8"
-  };
-
-  firebase.initializeApp(firebaseConfig);
-  var db = firebase.database();
-  var membersRef = db.ref("members");
-  var lunchesRef = db.ref("lunches");
-  var venmoRef = db.ref("venmo");
+  // Firebase REST API - no SDK needed
+  var DB_URL = "https://lunch-rotation-9c174-default-rtdb.firebaseio.com";
 
   var appData = { members: [], lunches: [], venmo: {} };
-  var dataReady = false;
+  var currentTab = "new";
+  var pollInterval = null;
 
-  // Sync status
-  var statusEl = document.getElementById("sync-status");
-  db.ref(".info/connected").on("value", function(snap) {
-    if (snap.val() === true) {
+  // REST API helpers
+  function fbGet(path, callback) {
+    fetch(DB_URL + "/" + path + ".json")
+      .then(function(res) { return res.json(); })
+      .then(function(data) { callback(null, data); })
+      .catch(function(err) { callback(err, null); });
+  }
+
+  function fbPut(path, data, callback) {
+    fetch(DB_URL + "/" + path + ".json", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
+  }
+
+  function fbPost(path, data, callback) {
+    fetch(DB_URL + "/" + path + ".json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
+  }
+
+  function fbDelete(path, callback) {
+    fetch(DB_URL + "/" + path + ".json", { method: "DELETE" })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
+  }
+
+  function fbPatch(path, data, callback) {
+    fetch(DB_URL + "/" + path + ".json", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
+  }
+
+  // Load all data from Firebase
+  function loadAllData() {
+    fbGet("", function(err, data) {
+      if (err) {
+        statusEl.textContent = "Offline - using local cache";
+        statusEl.className = "sync-status disconnected";
+        return;
+      }
+
       statusEl.textContent = "Live - Shared with team";
       statusEl.className = "sync-status connected";
-    } else {
-      statusEl.textContent = "Offline";
-      statusEl.className = "sync-status disconnected";
-    }
-  });
 
-  // Listen for members changes in real time
-  membersRef.on("value", function(snapshot) {
-    var val = snapshot.val();
-    appData.members = val ? val : [];
-    onDataChanged();
-  });
+      if (data) {
+        appData.members = data.members || [];
+        appData.venmo = data.venmo || {};
 
-  // Listen for venmo changes in real time
-  venmoRef.on("value", function(snapshot) {
-    var val = snapshot.val();
-    appData.venmo = val ? val : {};
-    onDataChanged();
-  });
-
-  // Listen for lunches changes in real time
-  lunchesRef.on("value", function(snapshot) {
-    var val = snapshot.val();
-    if (val) {
-      var arr = [];
-      var keys = Object.keys(val);
-      for (var i = 0; i < keys.length; i++) {
-        var lunch = val[keys[i]];
-        lunch.firebaseKey = keys[i];
-        arr.push(lunch);
+        if (data.lunches) {
+          var arr = [];
+          var keys = Object.keys(data.lunches);
+          for (var i = 0; i < keys.length; i++) {
+            var lunch = data.lunches[keys[i]];
+            lunch.firebaseKey = keys[i];
+            arr.push(lunch);
+          }
+          arr.sort(function(a, b) { return String(b.date).localeCompare(String(a.date)); });
+          appData.lunches = arr;
+        } else {
+          appData.lunches = [];
+        }
       }
-      arr.sort(function(a, b) { return String(b.date).localeCompare(String(a.date)); });
-      appData.lunches = arr;
-    } else {
-      appData.lunches = [];
-    }
-    onDataChanged();
-  });
+
+      onDataChanged();
+    });
+  }
+
+  var statusEl = document.getElementById("sync-status");
 
   function onDataChanged() {
-    dataReady = true;
     populateDropdowns();
     renderOrders();
     renderSuggestion();
@@ -488,7 +489,6 @@
     { id: "stats", label: "Stats" },
     { id: "members", label: "Members" }
   ];
-  var currentTab = "new";
 
   function buildTabs() {
     var bar = document.getElementById("tab-bar");
@@ -523,13 +523,11 @@
       }
     }
 
-    if (tab === "history") renderHistory();
-    if (tab === "stats") renderStats();
-    if (tab === "members") renderMembers();
-    if (tab === "new") { populateDropdowns(); renderOrders(); renderSuggestion(); }
+    // Refresh data when switching tabs
+    loadAllData();
   }
 
-  // Members - saved to Firebase
+  // Members
   function addMember() {
     var input = document.getElementById("new-member");
     var name = input.value.trim();
@@ -545,7 +543,9 @@
     }
     var newMembers = appData.members.slice();
     newMembers.push(name);
-    membersRef.set(newMembers);
+    fbPut("members", newMembers, function() {
+      loadAllData();
+    });
     input.value = "";
   }
 
@@ -555,7 +555,20 @@
       if (!confirm("Remove " + name + " from the group?")) return;
       var newMembers = appData.members.slice();
       newMembers.splice(idx, 1);
-      membersRef.set(newMembers);
+      fbPut("members", newMembers, function() {
+        loadAllData();
+      });
+    }
+  };
+
+  window.saveVenmo = function(idx, value) {
+    if (idx >= 0 && idx < appData.members.length) {
+      var name = appData.members[idx];
+      var updates = {};
+      updates[name] = value.trim();
+      fbPatch("venmo", updates, function() {
+        loadAllData();
+      });
     }
   };
 
@@ -579,15 +592,6 @@
     }
     container.innerHTML = html;
   }
-
-  window.saveVenmo = function(idx, value) {
-    if (idx >= 0 && idx < appData.members.length) {
-      var name = appData.members[idx];
-      var updates = {};
-      updates[name] = value.trim();
-      venmoRef.update(updates);
-    }
-  };
 
   // Dropdowns
   function populateDropdowns() {
@@ -691,7 +695,7 @@
       '</div>';
   }
 
-  // Save Lunch - saved to Firebase
+  // Save Lunch
   function saveLunch() {
     var date = document.getElementById("lunch-date").value;
     var place = document.getElementById("lunch-place").value.trim();
@@ -727,7 +731,9 @@
       id: Date.now()
     };
 
-    lunchesRef.push(lunchData);
+    fbPost("lunches", lunchData, function() {
+      loadAllData();
+    });
 
     document.getElementById("lunch-place").value = "";
     document.getElementById("payer").value = "";
@@ -736,10 +742,12 @@
     alert("Lunch saved!");
   }
 
-  // Delete lunch from Firebase
+  // Delete lunch
   window.deleteLunchByKey = function(key) {
     if (!confirm("Delete this lunch entry?")) return;
-    lunchesRef.child(key).remove();
+    fbDelete("lunches/" + key, function() {
+      loadAllData();
+    });
   };
 
   // History
@@ -871,6 +879,10 @@
   document.getElementById("btn-save").addEventListener("click", function() {
     saveLunch();
   });
+
+  // Load data and auto-refresh every 15 seconds
+  loadAllData();
+  pollInterval = setInterval(loadAllData, 15000);
 
 })();
 </script>
