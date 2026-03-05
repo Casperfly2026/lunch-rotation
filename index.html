@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -282,10 +283,10 @@
 
 <div class="container">
   <div class="tabs">
-    <button class="tab active" onclick="showTab('new')">📝 New Lunch</button>
-    <button class="tab" onclick="showTab('history')">📋 History</button>
-    <button class="tab" onclick="showTab('stats')">📊 Stats</button>
-    <button class="tab" onclick="showTab('members')">👥 Members</button>
+    <button class="tab active" onclick="showTab('new', this)">📝 New Lunch</button>
+    <button class="tab" onclick="showTab('history', this)">📋 History</button>
+    <button class="tab" onclick="showTab('stats', this)">📊 Stats</button>
+    <button class="tab" onclick="showTab('members', this)">👥 Members</button>
   </div>
 
   <!-- NEW LUNCH TAB -->
@@ -379,11 +380,11 @@ function saveData(data) {
 let data = loadData();
 
 // ─── Tabs ─────────────────────────────────────────────
-function showTab(tab) {
-  document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+function showTab(tab, btn) {
+  document.querySelectorAll('[id^="tab-"]').forEach(function(el) { el.classList.add('hidden'); });
   document.getElementById('tab-' + tab).classList.remove('hidden');
-  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+  document.querySelectorAll('.tab').forEach(function(el) { el.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
   if (tab === 'history') renderHistory();
   if (tab === 'stats') renderStats();
   if (tab === 'members') renderMembers();
