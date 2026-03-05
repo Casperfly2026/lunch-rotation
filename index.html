@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lunch Rotation Tracker</title>
+<style>
+  :root {
+    --primary: #4f46e5;
+    --primary-light: #818cf8;
+    --primary-bg: #eef2ff;
+    --danger: #ef4444;
+    --danger-bg: #fef2f2;
+    --success: #10b981;
+    --success-bg: #ecfdf5;
+    --warning: #f59e0b;
+    --warning-bg: #fffbeb;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--gray-100);
+    color: var(--gray-800);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .app-header {
+    background: linear-gradient(135deg, var(--primary), #7c3aed);
+    color: white;
+    padding: 24px 0;
+    text-align: center;
+    box-shadow: var(--shadow-md);
+  }
+  .app-header h1 { font-size: 1.75rem; font-weight: 700; }
+  .app-header p { opacity: 0.85; margin-top: 4px; font-size: 0.95rem; }
+  .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--gray-200);
+    border-radius: var(--radius);
+    padding: 4px;
+    margin-bottom: 24px;
+  }
+  .tab {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--gray-600);
+    transition: all 0.2s;
+  }
+  .tab:hover { color: var(--gray-800); }
+  .tab.active { background: white; color: var(--primary); box-shadow: var(--shadow); }
+  .card {
+    background: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 1.15rem;
+    margin-bottom: 16px;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .icon { font-size: 1.3rem; }
+  label { display: block; font-size: 0.85rem; font-weight: 500; color: var(--gray-600); margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--gray-300);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    color: var(--gray-800);
+    background: white;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+  }
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: #4338ca; }
+  .btn-success { background: var(--success); color: white; }
+  .btn-success:hover { background: #059669; }
+  .btn-danger { background: var(--danger); color: white; }
+  .btn-danger:hover { background: #dc2626; }
+  .btn-outline {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+  }
+  .btn-outline:hover { background: var(--primary-bg); }
+  .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+  .inline-form { display: flex; gap: 8px; align-items: end; }
+  .inline-form .field { flex: 1; }
+  .member-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .member-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--primary-bg);
+    color: var(--primary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .member-chip .remove {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(79,70,229,0.15);
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+  .member-chip .remove:hover { background: var(--danger); color: white; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .order-entry {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .order-entry:last-child { border-bottom: none; }
+  .order-check { display: flex; align-items: center; gap: 8px; }
+  .order-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); }
+  .order-check label { margin: 0; font-size: 0.95rem; color: var(--gray-800); font-weight: 500; }
+  .order-entry input[type="text"] { min-width: 0; }
+  .order-entry input[type="number"] { width: 90px; }
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0 0;
+    border-top: 2px solid var(--gray-200);
+    margin-top: 8px;
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+  .history-table th {
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--gray-50);
+    color: var(--gray-600);
+    font-weight: 600;
+    border-bottom: 2px solid var(--gray-200);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .history-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: top;
+  }
+  .history-table tr:hover td { background: var(--gray-50); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  .badge-pay { background: var(--warning-bg); color: #b45309; }
+  .badge-drive { background: var(--primary-bg); color: var(--primary); }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+  .stat-card {
+    background: var(--gray-50);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+  }
+  .stat-card .name { font-weight: 600; font-size: 1rem; margin-bottom: 8px; color: var(--gray-800); }
+  .stat-card .stat-row {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 6px;
+  }
+  .stat-card .stat-item { font-size: 0.82rem; color: var(--gray-600); }
+  .stat-card .stat-item strong { color: var(--gray-800); }
+  .fairness-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: var(--gray-200);
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .fairness-bar .fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .suggestion-box {
+    background: var(--success-bg);
+    border: 1px solid #a7f3d0;
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .suggestion-box .icon { font-size: 1.5rem; }
+  .suggestion-box .text { font-size: 0.92rem; }
+  .suggestion-box strong { color: #065f46; }
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--gray-400);
+  }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .delete-btn {
+    cursor: pointer;
+    color: var(--gray-400);
+    background: none;
+    border: none;
+    font-size: 1.1rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .delete-btn:hover { color: var(--danger); background: var(--danger-bg); }
+  .hidden { display: none; }
+  .order-details { font-size: 0.82rem; color: var(--gray-500); margin-top: 2px; }
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    .order-entry { grid-template-columns: auto 1fr; }
+    .order-entry input[type="number"] { width: 100%; }
+    .tabs { flex-wrap: wrap; }
+    .tab { font-size: 0.8rem; padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>🍕 Lunch Rotation Tracker</h1>
+  <p>Fair turns for paying & driving</p>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('new')">📝 New Lunch</button>
+    <button class="tab" onclick="showTab('history')">📋 History</button>
+    <button class="tab" onclick="showTab('stats')">📊 Stats</button>
+    <button class="tab" onclick="showTab('members')">👥 Members</button>
+  </div>
+
+  <!-- NEW LUNCH TAB -->
+  <div id="tab-new">
+    <div id="suggestion"></div>
+
+    <div class="card">
+      <h2><span class="icon">📅</span> Log a Lunch</h2>
+      <div class="form-row">
+        <div>
+          <label>Date</label>
+          <input type="date" id="lunch-date">
+        </div>
+        <div>
+          <label>Restaurant / Place</label>
+          <input type="text" id="lunch-place" placeholder="e.g. Panda Express">
+        </div>
+      </div>
+      <div class="form-row">
+        <div>
+          <label>Who's Paying?</label>
+          <select id="payer"><option value="">Select payer...</option></select>
+        </div>
+        <div>
+          <label>Who's Driving?</label>
+          <select id="driver"><option value="">Select driver...</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="icon">🛒</span> Orders</h2>
+      <div id="orders-list"></div>
+      <div class="total-row">
+        <span>Total</span>
+        <span id="order-total">$0.00</span>
+      </div>
+    </div>
+
+    <div style="text-align: right;">
+      <button class="btn btn-success" onclick="saveLunch()">✅ Save Lunch</button>
+    </div>
+  </div>
+
+  <!-- HISTORY TAB -->
+  <div id="tab-history" class="hidden">
+    <div class="card">
+      <h2><span class="icon">📋</span> Lunch History</h2>
+      <div id="history-content"></div>
+    </div>
+  </div>
+
+  <!-- STATS TAB -->
+  <div id="tab-stats" class="hidden">
+    <div class="card">
+      <h2><span class="icon">📊</span> Fairness Dashboard</h2>
+      <div id="stats-content"></div>
+    </div>
+  </div>
+
+  <!-- MEMBERS TAB -->
+  <div id="tab-members" class="hidden">
+    <div class="card">
+      <h2><span class="icon">👥</span> Manage Members</h2>
+      <div class="inline-form">
+        <div class="field">
+          <label>Add a new member</label>
+          <input type="text" id="new-member" placeholder="Enter name..." onkeydown="if(event.key==='Enter') addMember()">
+        </div>
+        <button class="btn btn-primary" onclick="addMember()" style="margin-bottom: 1px;">+ Add</button>
+      </div>
+      <div class="member-list" id="member-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Data ─────────────────────────────────────────────
+const STORAGE_KEY = 'lunchRotation';
+
+function loadData() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) return JSON.parse(raw);
+  return { members: [], lunches: [] };
+}
+
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+let data = loadData();
+
+// ─── Tabs ─────────────────────────────────────────────
+function showTab(tab) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.add('hidden'));
+  document.getElementById('tab-' + tab).classList.remove('hidden');
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  if (tab === 'history') renderHistory();
+  if (tab === 'stats') renderStats();
+  if (tab === 'members') renderMembers();
+  if (tab === 'new') { populateDropdowns(); renderOrders(); renderSuggestion(); }
+}
+
+// ─── Members ──────────────────────────────────────────
+function addMember() {
+  const input = document.getElementById('new-member');
+  const name = input.value.trim();
+  if (!name) return;
+  if (data.members.includes(name)) { alert(name + ' is already in the group.'); return; }
+  data.members.push(name);
+  saveData(data);
+  input.value = '';
+  renderMembers();
+  populateDropdowns();
+  renderOrders();
+  renderSuggestion();
+}
+
+function removeMember(name) {
+  if (!confirm('Remove ' + name + ' from the group?')) return;
+  data.members = data.members.filter(m => m !== name);
+  saveData(data);
+  renderMembers();
+  populateDropdowns();
+  renderOrders();
+  renderSuggestion();
+}
+
+function renderMembers() {
+  const container = document.getElementById('member-list');
+  if (data.members.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">👥</div><p>No members yet. Add people above!</p></div>';
+    return;
+  }
+  container.innerHTML = data.members.map(m =>
+    '<div class="member-chip">' + esc(m) +
+    '<span class="remove" onclick="removeMember(\'' + esc(m).replace(/'/g, "\\'") + '\')">&times;</span></div>'
+  ).join('');
+}
+
+// ─── Dropdowns ────────────────────────────────────────
+function populateDropdowns() {
+  ['payer', 'driver'].forEach(id => {
+    const sel = document.getElementById(id);
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Select ' + (id === 'payer' ? 'payer' : 'driver') + '...</option>';
+    data.members.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      sel.appendChild(opt);
+    });
+    if (current && data.members.includes(current)) sel.value = current;
+  });
+}
+
+// ─── Orders ───────────────────────────────────────────
+function renderOrders() {
+  const container = document.getElementById('orders-list');
+  if (data.members.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🛒</div><p>Add members first to start taking orders.</p></div>';
+    return;
+  }
+  container.innerHTML = data.members.map((m, i) =>
+    '<div class="order-entry">' +
+      '<div class="order-check">' +
+        '<input type="checkbox" id="order-chk-' + i + '" checked onchange="updateTotal()">' +
+        '<label for="order-chk-' + i + '">' + esc(m) + '</label>' +
+      '</div>' +
+      '<input type="text" id="order-item-' + i + '" placeholder="What they\'re ordering...">' +
+      '<input type="number" id="order-cost-' + i + '" placeholder="$0.00" min="0" step="0.01" onchange="updateTotal()" oninput="updateTotal()" style="width:100px">' +
+    '</div>'
+  ).join('');
+  updateTotal();
+}
+
+function updateTotal() {
+  let total = 0;
+  data.members.forEach((_, i) => {
+    const chk = document.getElementById('order-chk-' + i);
+    const cost = document.getElementById('order-cost-' + i);
+    if (chk && chk.checked && cost && parseFloat(cost.value)) {
+      total += parseFloat(cost.value);
+    }
+  });
+  document.getElementById('order-total').textContent = '$' + total.toFixed(2);
+}
+
+// ─── Suggestion ───────────────────────────────────────
+function getSuggestion() {
+  if (data.members.length < 2) return null;
+  const payCount = {};
+  const driveCount = {};
+  data.members.forEach(m => { payCount[m] = 0; driveCount[m] = 0; });
+  data.lunches.forEach(l => {
+    if (payCount[l.payer] !== undefined) payCount[l.payer]++;
+    if (driveCount[l.driver] !== undefined) driveCount[l.driver]++;
+  });
+  const minPay = Math.min(...data.members.map(m => payCount[m]));
+  const minDrive = Math.min(...data.members.map(m => driveCount[m]));
+  const payerCandidates = data.members.filter(m => payCount[m] === minPay);
+  const driverCandidates = data.members.filter(m => driveCount[m] === minDrive);
+  return {
+    payer: payerCandidates[0],
+    driver: driverCandidates.find(d => d !== payerCandidates[0]) || driverCandidates[0],
+    payCount: minPay,
+    driveCount: minDrive
+  };
+}
+
+function renderSuggestion() {
+  const box = document.getElementById('suggestion');
+  const s = getSuggestion();
+  if (!s) { box.innerHTML = ''; return; }
+  box.innerHTML =
+    '<div class="suggestion-box">' +
+      '<div class="icon">💡</div>' +
+      '<div class="text">Suggested next rotation: <strong>' + esc(s.payer) + '</strong> pays' +
+      (s.payer !== s.driver ? ' and <strong>' + esc(s.driver) + '</strong> drives' : ' and drives') +
+      ' (least turns so far)</div>' +
+    '</div>';
+}
+
+// ─── Save Lunch ───────────────────────────────────────
+function saveLunch() {
+  const date = document.getElementById('lunch-date').value;
+  const place = document.getElementById('lunch-place').value.trim();
+  const payer = document.getElementById('payer').value;
+  const driver = document.getElementById('driver').value;
+
+  if (!date) { alert('Please select a date.'); return; }
+  if (!payer) { alert('Please select who is paying.'); return; }
+  if (!driver) { alert('Please select who is driving.'); return; }
+
+  const orders = [];
+  data.members.forEach((m, i) => {
+    const chk = document.getElementById('order-chk-' + i);
+    if (chk && chk.checked) {
+      const item = document.getElementById('order-item-' + i).value.trim();
+      const cost = parseFloat(document.getElementById('order-cost-' + i).value) || 0;
+      orders.push({ name: m, item, cost });
+    }
+  });
+
+  if (orders.length === 0) { alert('At least one person should be ordering.'); return; }
+
+  const total = orders.reduce((s, o) => s + o.cost, 0);
+
+  data.lunches.push({ date, place, payer, driver, orders, total, id: Date.now() });
+  data.lunches.sort((a, b) => b.date.localeCompare(a.date));
+  saveData(data);
+
+  // Reset form
+  document.getElementById('lunch-place').value = '';
+  document.getElementById('payer').value = '';
+  document.getElementById('driver').value = '';
+  renderOrders();
+  renderSuggestion();
+  alert('Lunch saved! 🎉');
+}
+
+// ─── History ──────────────────────────────────────────
+function renderHistory() {
+  const container = document.getElementById('history-content');
+  if (data.lunches.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>No lunches logged yet. Go log your first one!</p></div>';
+    return;
+  }
+  let html = '<table class="history-table"><thead><tr>' +
+    '<th>Date</th><th>Place</th><th>Payer</th><th>Driver</th><th>Orders</th><th>Total</th><th></th>' +
+    '</tr></thead><tbody>';
+  data.lunches.forEach(l => {
+    const orderSummary = l.orders.map(o =>
+      esc(o.name) + (o.item ? ': ' + esc(o.item) : '') + (o.cost ? ' ($' + o.cost.toFixed(2) + ')' : '')
+    ).join('<br>');
+    html += '<tr>' +
+      '<td>' + esc(l.date) + '</td>' +
+      '<td>' + esc(l.place || '—') + '</td>' +
+      '<td><span class="badge badge-pay">💳 ' + esc(l.payer) + '</span></td>' +
+      '<td><span class="badge badge-drive">🚗 ' + esc(l.driver) + '</span></td>' +
+      '<td style="font-size:0.82rem">' + orderSummary + '</td>' +
+      '<td><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
+      '<td><button class="delete-btn" onclick="deleteLunch(' + l.id + ')" title="Delete">🗑️</button></td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function deleteLunch(id) {
+  if (!confirm('Delete this lunch entry?')) return;
+  data.lunches = data.lunches.filter(l => l.id !== id);
+  saveData(data);
+  renderHistory();
+}
+
+// ─── Stats ────────────────────────────────────────────
+function renderStats() {
+  const container = document.getElementById('stats-content');
+  if (data.members.length === 0 || data.lunches.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📊</div><p>Log some lunches to see fairness stats.</p></div>';
+    return;
+  }
+
+  const stats = {};
+  data.members.forEach(m => { stats[m] = { paid: 0, drove: 0, ordered: 0, spent: 0, paidTotal: 0 }; });
+
+  data.lunches.forEach(l => {
+    if (stats[l.payer]) { stats[l.payer].paid++; stats[l.payer].paidTotal += (l.total || 0); }
+    if (stats[l.driver]) stats[l.driver].drove++;
+    l.orders.forEach(o => {
+      if (stats[o.name]) { stats[o.name].ordered++; stats[o.name].spent += (o.cost || 0); }
+    });
+  });
+
+  const maxPay = Math.max(...data.members.map(m => stats[m].paid), 1);
+  const maxDrive = Math.max(...data.members.map(m => stats[m].drove), 1);
+
+  let html = '<div class="stats-grid">';
+  data.members.forEach(m => {
+    const s = stats[m];
+    const payPct = (s.paid / maxPay) * 100;
+    const drivePct = (s.drove / maxDrive) * 100;
+    const payColor = payPct >= 80 ? 'var(--success)' : payPct >= 40 ? 'var(--warning)' : 'var(--danger)';
+    const driveColor = drivePct >= 80 ? 'var(--success)' : drivePct >= 40 ? 'var(--warning)' : 'var(--danger)';
+    html +=
+      '<div class="stat-card">' +
+        '<div class="name">' + esc(m) + '</div>' +
+        '<div class="stat-row">' +
+          '<div class="stat-item">💳 Paid: <strong>' + s.paid + 'x</strong></div>' +
+          '<div class="stat-item">🚗 Drove: <strong>' + s.drove + 'x</strong></div>' +
+        '</div>' +
+        '<div class="stat-row">' +
+          '<div class="stat-item">🛒 Ordered: <strong>' + s.ordered + 'x</strong></div>' +
+          '<div class="stat-item">💰 Spent: <strong>$' + s.spent.toFixed(2) + '</strong></div>' +
+        '</div>' +
+        '<div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px">Covered: $' + s.paidTotal.toFixed(2) + ' total for group</div>' +
+        '<div style="margin-top:8px;font-size:0.75rem;color:var(--gray-500)">Pay fairness</div>' +
+        '<div class="fairness-bar"><div class="fill" style="width:' + payPct + '%;background:' + payColor + '"></div></div>' +
+        '<div style="margin-top:6px;font-size:0.75rem;color:var(--gray-500)">Drive fairness</div>' +
+        '<div class="fairness-bar"><div class="fill" style="width:' + drivePct + '%;background:' + driveColor + '"></div></div>' +
+      '</div>';
+  });
+  html += '</div>';
+
+  // Summary table
+  html += '<div style="margin-top: 24px;"><h3 style="font-size:1rem;margin-bottom:12px;">Summary</h3>';
+  html += '<table class="history-table"><thead><tr><th>Member</th><th>Times Paid</th><th>Times Drove</th><th>Times Ordered</th><th>Own Spending</th><th>Covered for Group</th></tr></thead><tbody>';
+  data.members.forEach(m => {
+    const s = stats[m];
+    html += '<tr><td><strong>' + esc(m) + '</strong></td><td>' + s.paid + '</td><td>' + s.drove + '</td><td>' + s.ordered +
+      '</td><td>$' + s.spent.toFixed(2) + '</td><td>$' + s.paidTotal.toFixed(2) + '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+
+  container.innerHTML = html;
+}
+
+// ─── Helpers ──────────────────────────────────────────
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str || '';
+  return d.innerHTML;
+}
+
+// ─── Init ─────────────────────────────────────────────
+document.getElementById('lunch-date').value = new Date().toISOString().split('T')[0];
+populateDropdowns();
+renderOrders();
+renderSuggestion();
+</script>
+
+</body>
+</html>
