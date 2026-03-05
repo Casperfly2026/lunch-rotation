@@ -351,7 +351,14 @@
           <button class="btn btn-primary btn-sm" id="btn-split">Split Evenly</button>
         </div>
       </div>
-      <div style="font-size:0.82rem;color:var(--gray-500);margin-bottom:10px">Or enter each person's amount individually:</div>
+      <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">
+        <div style="flex:1">
+          <label>Add person to this order</label>
+          <select id="add-orderer"><option value="">Select member...</option></select>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-add-orderer">+ Add</button>
+        <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
+      </div>
       <div id="orders-list"></div>
       <div class="total-row">
         <span>Individual Total</span>
@@ -629,7 +636,52 @@
       }
       sel.value = current;
     }
+    // Also update the "add orderer" dropdown
+    populateOrdererDropdown();
   }
+
+  function populateOrdererDropdown() {
+    var sel = document.getElementById("add-orderer");
+    sel.innerHTML = '<option value="">Select member...</option>';
+    for (var i = 0; i < appData.members.length; i++) {
+      // Only show members not already in today's order
+      var alreadyIn = false;
+      for (var j = 0; j < orderMembers.length; j++) {
+        if (orderMembers[j] === appData.members[i]) { alreadyIn = true; break; }
+      }
+      if (!alreadyIn) {
+        var opt = document.createElement("option");
+        opt.value = appData.members[i];
+        opt.textContent = appData.members[i];
+        sel.appendChild(opt);
+      }
+    }
+  }
+
+  // Track who is in today's order (not everyone by default)
+  var orderMembers = [];
+
+  window.addOrderer = function() {
+    var sel = document.getElementById("add-orderer");
+    var name = sel.value;
+    if (!name) return;
+    orderMembers.push(name);
+    sel.value = "";
+    populateOrdererDropdown();
+    renderOrders();
+  };
+
+  window.addAllOrderers = function() {
+    orderMembers = appData.members.slice();
+    populateOrdererDropdown();
+    renderOrders();
+  };
+
+  window.removeOrderer = function(idx) {
+    orderMembers.splice(idx, 1);
+    populateOrdererDropdown();
+    renderOrders();
+  };
 
   // Orders - grand total from top inputs
   window.updateGrandTotal = function() {
@@ -640,7 +692,7 @@
     document.getElementById("grand-total").textContent = "$" + grand.toFixed(2);
   };
 
-  // Split evenly among checked members
+  // Split evenly among people in today's order
   window.splitEvenly = function() {
     var orderTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
     var tax = parseFloat(document.getElementById("bulk-tax").value) || 0;
@@ -651,23 +703,15 @@
       alert("Please enter the order total first.");
       return;
     }
-
-    // Count checked members
-    var checkedCount = 0;
-    for (var i = 0; i < appData.members.length; i++) {
-      var chk = document.getElementById("order-chk-" + i);
-      if (chk && chk.checked) checkedCount++;
-    }
-    if (checkedCount === 0) {
-      alert("No members are checked. Check who is ordering first.");
+    if (orderMembers.length === 0) {
+      alert("Add people to the order first.");
       return;
     }
 
-    var perPerson = Math.round((grand / checkedCount) * 100) / 100;
-    for (var j = 0; j < appData.members.length; j++) {
-      var chk2 = document.getElementById("order-chk-" + j);
+    var perPerson = Math.round((grand / orderMembers.length) * 100) / 100;
+    for (var j = 0; j < orderMembers.length; j++) {
       var costInput = document.getElementById("order-cost-" + j);
-      if (chk2 && chk2.checked && costInput) {
+      if (costInput) {
         costInput.value = perPerson.toFixed(2);
       }
     }
@@ -677,10 +721,9 @@
   // Individual totals
   window.updateTotal = function() {
     var total = 0;
-    for (var i = 0; i < appData.members.length; i++) {
-      var chk = document.getElementById("order-chk-" + i);
+    for (var i = 0; i < orderMembers.length; i++) {
       var cost = document.getElementById("order-cost-" + i);
-      if (chk && chk.checked && cost && parseFloat(cost.value)) {
+      if (cost && parseFloat(cost.value)) {
         total += parseFloat(cost.value);
       }
     }
@@ -689,16 +732,16 @@
 
   function renderOrders() {
     var container = document.getElementById("orders-list");
-    if (appData.members.length === 0) {
-      container.innerHTML = '<div class="empty-state"><p>Add members first to start taking orders.</p></div>';
+    if (orderMembers.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>Add people to this order using the dropdown above.</p></div>';
       return;
     }
     var html = "";
-    for (var i = 0; i < appData.members.length; i++) {
+    for (var i = 0; i < orderMembers.length; i++) {
       html += '<div class="order-entry">' +
         '<div class="order-check">' +
-          '<input type="checkbox" id="order-chk-' + i + '" checked onchange="updateTotal()">' +
-          '<label for="order-chk-' + i + '">' + esc(appData.members[i]) + '</label>' +
+          '<strong style="font-size:0.95rem">' + esc(orderMembers[i]) + '</strong>' +
+          '<button class="remove-btn" onclick="removeOrderer(' + i + ')" title="Remove" style="margin-left:4px;font-size:0.85rem;padding:2px 6px">&times;</button>' +
         '</div>' +
         '<input type="text" id="order-item-' + i + '" placeholder="What they are ordering...">' +
         '<input type="number" id="order-cost-' + i + '" placeholder="$0.00" min="0" step="0.01" oninput="updateTotal()" style="width:100px">' +
@@ -771,16 +814,13 @@
     if (!driver) { alert("Please select who is driving."); return; }
 
     var orders = [];
-    for (var i = 0; i < appData.members.length; i++) {
-      var chk = document.getElementById("order-chk-" + i);
-      if (chk && chk.checked) {
-        var item = document.getElementById("order-item-" + i).value.trim();
-        var cost = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
-        orders.push({ name: appData.members[i], item: item, cost: cost });
-      }
+    for (var i = 0; i < orderMembers.length; i++) {
+      var item = document.getElementById("order-item-" + i).value.trim();
+      var cost = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
+      orders.push({ name: orderMembers[i], item: item, cost: cost });
     }
 
-    if (orders.length === 0) { alert("At least one person should be ordering."); return; }
+    if (orders.length === 0) { alert("Add at least one person to the order."); return; }
 
     // Use grand total if filled, otherwise sum individual costs
     var bulkTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
@@ -817,6 +857,8 @@
     document.getElementById("bulk-total").value = "";
     document.getElementById("bulk-tax").value = "";
     document.getElementById("bulk-tips").value = "";
+    orderMembers = [];
+    populateOrdererDropdown();
     document.getElementById("grand-total").textContent = "$0.00";
     renderOrders();
     alert("Lunch saved!");
@@ -955,6 +997,12 @@
   });
   document.getElementById("new-member").addEventListener("keydown", function(e) {
     if (e.key === "Enter") addMember();
+  });
+  document.getElementById("btn-add-orderer").addEventListener("click", function() {
+    window.addOrderer();
+  });
+  document.getElementById("btn-add-all").addEventListener("click", function() {
+    window.addAllOrderers();
   });
   document.getElementById("btn-split").addEventListener("click", function() {
     window.splitEvenly();
