@@ -31,7 +31,7 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: var(--gray-100);
     color: var(--gray-800);
     line-height: 1.5;
@@ -46,6 +46,16 @@
   }
   .app-header h1 { font-size: 1.75rem; font-weight: 700; }
   .app-header p { opacity: 0.85; margin-top: 4px; font-size: 0.95rem; }
+  .sync-status {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    margin-top: 6px;
+    background: rgba(255,255,255,0.2);
+  }
+  .sync-status.connected { background: rgba(16,185,129,0.3); }
+  .sync-status.disconnected { background: rgba(239,68,68,0.3); }
   .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
   .tabs {
     display: flex;
@@ -84,7 +94,6 @@
     align-items: center;
     gap: 8px;
   }
-  .card h2 .icon { font-size: 1.3rem; }
   label { display: block; font-size: 0.85rem; font-weight: 500; color: var(--gray-600); margin-bottom: 4px; }
   input, select, textarea {
     width: 100%;
@@ -160,8 +169,6 @@
   .order-check { display: flex; align-items: center; gap: 8px; }
   .order-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); }
   .order-check label { margin: 0; font-size: 0.95rem; color: var(--gray-800); font-weight: 500; }
-  .order-entry input[type="text"] { min-width: 0; }
-  .order-entry input[type="number"] { width: 90px; }
   .total-row {
     display: flex;
     justify-content: space-between;
@@ -237,15 +244,12 @@
     align-items: center;
     gap: 12px;
   }
-  .suggestion-box .icon { font-size: 1.5rem; }
-  .suggestion-box .text { font-size: 0.92rem; }
   .suggestion-box strong { color: #065f46; }
   .empty-state {
     text-align: center;
     padding: 40px 20px;
     color: var(--gray-400);
   }
-  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
   .delete-btn {
     cursor: pointer;
     color: var(--gray-400);
@@ -257,6 +261,7 @@
   }
   .delete-btn:hover { color: var(--danger); background: var(--danger-bg); }
   .hidden { display: none; }
+  .loading { text-align: center; padding: 40px; color: var(--gray-400); }
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
     .order-entry { grid-template-columns: auto 1fr; }
@@ -271,6 +276,7 @@
 <div class="app-header">
   <h1>Lunch Rotation Tracker</h1>
   <p>Fair turns for paying and driving</p>
+  <div class="sync-status" id="sync-status">Connecting...</div>
 </div>
 
 <div class="container">
@@ -279,7 +285,7 @@
   <div id="tab-new">
     <div id="suggestion"></div>
     <div class="card">
-      <h2><span class="icon">+</span> Log a Lunch</h2>
+      <h2>Log a Lunch</h2>
       <div class="form-row">
         <div>
           <label>Date</label>
@@ -302,7 +308,7 @@
       </div>
     </div>
     <div class="card">
-      <h2><span class="icon">$</span> Orders</h2>
+      <h2>Orders</h2>
       <div id="orders-list"></div>
       <div class="total-row">
         <span>Total</span>
@@ -343,29 +349,75 @@
   </div>
 </div>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
 (function() {
   "use strict";
 
-  var STORAGE_KEY = "lunchRotation";
-  var appData;
+  // Firebase config
+  var firebaseConfig = {
+    databaseURL: "https://lunch-rotation-9c174-default-rtdb.firebaseio.com",
+    projectId: "lunch-rotation-9c174",
+    appId: "1:108583375577:web:49faf7706fa71d2a2724c8"
+  };
 
-  function loadData() {
-    try {
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (err) {
-      console.error("Failed to load data:", err);
-    }
-    return { members: [], lunches: [] };
-  }
+  firebase.initializeApp(firebaseConfig);
+  var db = firebase.database();
+  var membersRef = db.ref("members");
+  var lunchesRef = db.ref("lunches");
 
-  function saveData() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-    } catch (err) {
-      console.error("Failed to save data:", err);
+  var appData = { members: [], lunches: [] };
+  var dataReady = false;
+
+  // Sync status
+  var statusEl = document.getElementById("sync-status");
+  db.ref(".info/connected").on("value", function(snap) {
+    if (snap.val() === true) {
+      statusEl.textContent = "Live - Shared with team";
+      statusEl.className = "sync-status connected";
+    } else {
+      statusEl.textContent = "Offline";
+      statusEl.className = "sync-status disconnected";
     }
+  });
+
+  // Listen for members changes in real time
+  membersRef.on("value", function(snapshot) {
+    var val = snapshot.val();
+    appData.members = val ? val : [];
+    onDataChanged();
+  });
+
+  // Listen for lunches changes in real time
+  lunchesRef.on("value", function(snapshot) {
+    var val = snapshot.val();
+    if (val) {
+      var arr = [];
+      var keys = Object.keys(val);
+      for (var i = 0; i < keys.length; i++) {
+        var lunch = val[keys[i]];
+        lunch.firebaseKey = keys[i];
+        arr.push(lunch);
+      }
+      arr.sort(function(a, b) { return String(b.date).localeCompare(String(a.date)); });
+      appData.lunches = arr;
+    } else {
+      appData.lunches = [];
+    }
+    onDataChanged();
+  });
+
+  function onDataChanged() {
+    dataReady = true;
+    populateDropdowns();
+    renderOrders();
+    renderSuggestion();
+    if (currentTab === "history") renderHistory();
+    if (currentTab === "stats") renderStats();
+    if (currentTab === "members") renderMembers();
   }
 
   function esc(str) {
@@ -422,7 +474,7 @@
     if (tab === "new") { populateDropdowns(); renderOrders(); renderSuggestion(); }
   }
 
-  // Members
+  // Members - saved to Firebase
   function addMember() {
     var input = document.getElementById("new-member");
     var name = input.value.trim();
@@ -436,40 +488,26 @@
         return;
       }
     }
-    appData.members.push(name);
-    saveData();
+    var newMembers = appData.members.slice();
+    newMembers.push(name);
+    membersRef.set(newMembers);
     input.value = "";
-    renderMembers();
-    populateDropdowns();
-    renderOrders();
-    renderSuggestion();
   }
 
-  function removeMember(name) {
-    if (!confirm("Remove " + name + " from the group?")) return;
-    var filtered = [];
-    for (var i = 0; i < appData.members.length; i++) {
-      if (appData.members[i] !== name) filtered.push(appData.members[i]);
-    }
-    appData.members = filtered;
-    saveData();
-    renderMembers();
-    populateDropdowns();
-    renderOrders();
-    renderSuggestion();
-  }
-
-  // Make removeMember accessible from onclick in HTML
   window.removeMemberByIndex = function(idx) {
     if (idx >= 0 && idx < appData.members.length) {
-      removeMember(appData.members[idx]);
+      var name = appData.members[idx];
+      if (!confirm("Remove " + name + " from the group?")) return;
+      var newMembers = appData.members.slice();
+      newMembers.splice(idx, 1);
+      membersRef.set(newMembers);
     }
   };
 
   function renderMembers() {
     var container = document.getElementById("member-list");
     if (appData.members.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="icon" style="font-size:2.5rem">?</div><p>No members yet. Add people above!</p></div>';
+      container.innerHTML = '<div class="empty-state"><p>No members yet. Add people above!</p></div>';
       return;
     }
     var html = "";
@@ -575,14 +613,14 @@
     if (!s) { box.innerHTML = ""; return; }
     box.innerHTML =
       '<div class="suggestion-box">' +
-        '<div class="icon">Tip:</div>' +
-        '<div class="text">Suggested next rotation: <strong>' + esc(s.payer) + '</strong> pays' +
+        '<div><strong>Tip:</strong></div>' +
+        '<div>Suggested next rotation: <strong>' + esc(s.payer) + '</strong> pays' +
         (s.payer !== s.driver ? ' and <strong>' + esc(s.driver) + '</strong> drives' : ' and drives') +
         ' (least turns so far)</div>' +
       '</div>';
   }
 
-  // Save Lunch
+  // Save Lunch - saved to Firebase
   function saveLunch() {
     var date = document.getElementById("lunch-date").value;
     var place = document.getElementById("lunch-place").value.trim();
@@ -608,7 +646,7 @@
     var total = 0;
     for (var j = 0; j < orders.length; j++) total += orders[j].cost;
 
-    appData.lunches.push({
+    var lunchData = {
       date: date,
       place: place,
       payer: payer,
@@ -616,30 +654,24 @@
       orders: orders,
       total: total,
       id: Date.now()
-    });
-    appData.lunches.sort(function(a, b) { return b.date.localeCompare(a.date); });
-    saveData();
+    };
+
+    lunchesRef.push(lunchData);
 
     document.getElementById("lunch-place").value = "";
     document.getElementById("payer").value = "";
     document.getElementById("driver").value = "";
     renderOrders();
-    renderSuggestion();
     alert("Lunch saved!");
   }
 
-  // History
-  window.deleteLunchById = function(id) {
+  // Delete lunch from Firebase
+  window.deleteLunchByKey = function(key) {
     if (!confirm("Delete this lunch entry?")) return;
-    var filtered = [];
-    for (var i = 0; i < appData.lunches.length; i++) {
-      if (appData.lunches[i].id !== id) filtered.push(appData.lunches[i]);
-    }
-    appData.lunches = filtered;
-    saveData();
-    renderHistory();
+    lunchesRef.child(key).remove();
   };
 
+  // History
   function renderHistory() {
     var container = document.getElementById("history-content");
     if (appData.lunches.length === 0) {
@@ -652,13 +684,16 @@
     for (var i = 0; i < appData.lunches.length; i++) {
       var l = appData.lunches[i];
       var orderParts = [];
-      for (var j = 0; j < l.orders.length; j++) {
-        var o = l.orders[j];
-        var line = esc(o.name);
-        if (o.item) line += ": " + esc(o.item);
-        if (o.cost) line += " ($" + o.cost.toFixed(2) + ")";
-        orderParts.push(line);
+      if (l.orders) {
+        for (var j = 0; j < l.orders.length; j++) {
+          var o = l.orders[j];
+          var line = esc(o.name);
+          if (o.item) line += ": " + esc(o.item);
+          if (o.cost) line += " ($" + o.cost.toFixed(2) + ")";
+          orderParts.push(line);
+        }
       }
+      var key = l.firebaseKey ? l.firebaseKey : "";
       html += '<tr>' +
         '<td>' + esc(l.date) + '</td>' +
         '<td>' + esc(l.place || "-") + '</td>' +
@@ -666,7 +701,7 @@
         '<td><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
         '<td style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
         '<td><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
-        '<td><button class="delete-btn" onclick="deleteLunchById(' + l.id + ')" title="Delete">X</button></td>' +
+        '<td><button class="delete-btn" onclick="deleteLunchByKey(\'' + key + '\')" title="Delete">X</button></td>' +
         '</tr>';
     }
     html += '</tbody></table>';
@@ -691,9 +726,11 @@
       l = appData.lunches[i];
       if (stats[l.payer]) { stats[l.payer].paid++; stats[l.payer].paidTotal += (l.total || 0); }
       if (stats[l.driver]) stats[l.driver].drove++;
-      for (j = 0; j < l.orders.length; j++) {
-        o = l.orders[j];
-        if (stats[o.name]) { stats[o.name].ordered++; stats[o.name].spent += (o.cost || 0); }
+      if (l.orders) {
+        for (j = 0; j < l.orders.length; j++) {
+          o = l.orders[j];
+          if (stats[o.name]) { stats[o.name].ordered++; stats[o.name].spent += (o.cost || 0); }
+        }
       }
     }
 
@@ -746,27 +783,18 @@
   }
 
   // Init
-  appData = loadData();
-
   buildTabs();
-
   document.getElementById("lunch-date").value = new Date().toISOString().split("T")[0];
 
   document.getElementById("btn-add-member").addEventListener("click", function() {
     addMember();
   });
-
   document.getElementById("new-member").addEventListener("keydown", function(e) {
     if (e.key === "Enter") addMember();
   });
-
   document.getElementById("btn-save").addEventListener("click", function() {
     saveLunch();
   });
-
-  populateDropdowns();
-  renderOrders();
-  renderSuggestion();
 
 })();
 </script>
