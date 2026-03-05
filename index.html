@@ -451,10 +451,9 @@
       </div>
       <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">
         <div style="flex:1">
-          <label>Add person to this order</label>
+          <label>Add person to this order (select to add)</label>
           <select id="add-orderer"><option value="">Select member...</option></select>
         </div>
-        <button class="btn btn-primary btn-sm" id="btn-add-orderer">+ Add</button>
         <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
       </div>
       <div id="orders-list"></div>
@@ -1171,7 +1170,7 @@
   document.getElementById("new-member").addEventListener("keydown", function(e) {
     if (e.key === "Enter") addMember();
   });
-  document.getElementById("btn-add-orderer").addEventListener("click", function() {
+  document.getElementById("add-orderer").addEventListener("change", function() {
     window.addOrderer();
   });
   document.getElementById("btn-add-all").addEventListener("click", function() {
