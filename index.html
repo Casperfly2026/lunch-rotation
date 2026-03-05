@@ -156,6 +156,53 @@
     line-height: 1;
   }
   .member-chip .remove:hover { background: var(--danger); color: white; }
+  .member-card {
+    background: var(--gray-50);
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .member-card .member-name {
+    font-weight: 600;
+    font-size: 1rem;
+    min-width: 100px;
+  }
+  .member-card .venmo-input {
+    flex: 1;
+    min-width: 150px;
+    padding: 6px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+  .member-card .remove-btn {
+    cursor: pointer;
+    color: var(--gray-400);
+    background: none;
+    border: none;
+    font-size: 1rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+  .member-card .remove-btn:hover { color: var(--danger); background: var(--danger-bg); }
+  .venmo-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #008CFF;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-decoration: none;
+    margin-left: 6px;
+  }
+  .venmo-link:hover { background: #0070cc; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
   .order-entry {
     display: grid;
@@ -368,8 +415,9 @@
   var db = firebase.database();
   var membersRef = db.ref("members");
   var lunchesRef = db.ref("lunches");
+  var venmoRef = db.ref("venmo");
 
-  var appData = { members: [], lunches: [] };
+  var appData = { members: [], lunches: [], venmo: {} };
   var dataReady = false;
 
   // Sync status
@@ -388,6 +436,13 @@
   membersRef.on("value", function(snapshot) {
     var val = snapshot.val();
     appData.members = val ? val : [];
+    onDataChanged();
+  });
+
+  // Listen for venmo changes in real time
+  venmoRef.on("value", function(snapshot) {
+    var val = snapshot.val();
+    appData.venmo = val ? val : {};
     onDataChanged();
   });
 
@@ -512,11 +567,27 @@
     }
     var html = "";
     for (var i = 0; i < appData.members.length; i++) {
-      html += '<div class="member-chip">' + esc(appData.members[i]) +
-        ' <span class="remove" onclick="removeMemberByIndex(' + i + ')">&times;</span></div>';
+      var name = appData.members[i];
+      var venmoUser = appData.venmo[name] || "";
+      html += '<div class="member-card">' +
+        '<div class="member-name">' + esc(name) + '</div>' +
+        '<input class="venmo-input" type="text" placeholder="Venmo username (e.g. @john-doe)" ' +
+          'value="' + esc(venmoUser) + '" onchange="saveVenmo(' + i + ', this.value)">' +
+        (venmoUser ? '<a class="venmo-link" href="https://venmo.com/' + esc(venmoUser.replace("@", "")) + '" target="_blank">Venmo</a>' : '') +
+        '<button class="remove-btn" onclick="removeMemberByIndex(' + i + ')" title="Remove">&times;</button>' +
+        '</div>';
     }
     container.innerHTML = html;
   }
+
+  window.saveVenmo = function(idx, value) {
+    if (idx >= 0 && idx < appData.members.length) {
+      var name = appData.members[idx];
+      var updates = {};
+      updates[name] = value.trim();
+      venmoRef.update(updates);
+    }
+  };
 
   // Dropdowns
   function populateDropdowns() {
@@ -694,10 +765,15 @@
         }
       }
       var key = l.firebaseKey ? l.firebaseKey : "";
+      var payerVenmo = appData.venmo[l.payer] || "";
+      var venmoPayLink = "";
+      if (payerVenmo) {
+        venmoPayLink = '<a class="venmo-link" href="https://venmo.com/' + esc(payerVenmo.replace("@", "")) + '" target="_blank">Pay</a>';
+      }
       html += '<tr>' +
         '<td>' + esc(l.date) + '</td>' +
         '<td>' + esc(l.place || "-") + '</td>' +
-        '<td><span class="badge badge-pay">' + esc(l.payer) + '</span></td>' +
+        '<td><span class="badge badge-pay">' + esc(l.payer) + '</span>' + venmoPayLink + '</td>' +
         '<td><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
         '<td style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
         '<td><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
