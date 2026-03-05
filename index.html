@@ -273,6 +273,86 @@
     padding: 40px 20px;
     color: var(--gray-400);
   }
+  .dice-card {
+    background: linear-gradient(135deg, #fef3c7, #fde68a);
+    border: 2px solid #f59e0b;
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .dice-card h2 {
+    justify-content: center;
+    margin-bottom: 12px;
+    color: var(--gray-800);
+  }
+  .dice-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .dice-slot {
+    text-align: center;
+  }
+  .dice-slot .label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .dice-slot .result {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--gray-800);
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .dice-slot .result.spinning {
+    animation: slotSpin 0.1s linear infinite;
+  }
+  @keyframes slotSpin {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+  }
+  .dice-btn {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+  }
+  .dice-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 16px rgba(239,68,68,0.4);
+  }
+  .dice-btn:active { transform: scale(0.95); }
+  .dice-btn.rolling {
+    animation: shake 0.3s ease-in-out infinite;
+  }
+  @keyframes shake {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-5deg); }
+    75% { transform: rotate(5deg); }
+  }
+  .dice-accept {
+    margin-top: 12px;
+    display: none;
+    gap: 8px;
+    justify-content: center;
+  }
+  .dice-accept.show { display: flex; }
   .delete-btn {
     cursor: pointer;
     color: var(--gray-400);
@@ -305,6 +385,24 @@
   <div class="tabs" id="tab-bar"></div>
 
   <div id="tab-new">
+    <div class="dice-card">
+      <h2>🎲 Who's paying &amp; driving today?</h2>
+      <div class="dice-container">
+        <div class="dice-slot">
+          <div class="label">💳 Payer</div>
+          <div class="result" id="dice-payer">?</div>
+        </div>
+        <div class="dice-slot">
+          <div class="label">🚗 Driver</div>
+          <div class="result" id="dice-driver">?</div>
+        </div>
+      </div>
+      <button class="dice-btn" id="btn-roll">🎲 Roll the Dice!</button>
+      <div class="dice-accept" id="dice-accept">
+        <button class="btn btn-success btn-sm" id="btn-accept-roll">Use this pick</button>
+        <button class="btn btn-sm" id="btn-reroll" style="background:var(--gray-200);color:var(--gray-700)">Re-roll</button>
+      </div>
+    </div>
     <div id="suggestion"></div>
     <div class="card">
       <h2>Log a Lunch</h2>
@@ -991,6 +1089,67 @@
     container.innerHTML = html;
   }
 
+  // Dice roller
+  var rolledPayer = "";
+  var rolledDriver = "";
+
+  function rollDice() {
+    if (appData.members.length < 2) {
+      alert("Need at least 2 members to roll!");
+      return;
+    }
+
+    var diceBtn = document.getElementById("btn-roll");
+    var payerEl = document.getElementById("dice-payer");
+    var driverEl = document.getElementById("dice-driver");
+    var acceptEl = document.getElementById("dice-accept");
+
+    diceBtn.classList.add("rolling");
+    acceptEl.classList.remove("show");
+    payerEl.classList.add("spinning");
+    driverEl.classList.add("spinning");
+
+    var shuffleCount = 0;
+    var totalShuffles = 20;
+    var shuffleInterval = setInterval(function() {
+      var randPayer = appData.members[Math.floor(Math.random() * appData.members.length)];
+      var randDriver = appData.members[Math.floor(Math.random() * appData.members.length)];
+      payerEl.textContent = randPayer;
+      driverEl.textContent = randDriver;
+      shuffleCount++;
+
+      if (shuffleCount >= totalShuffles) {
+        clearInterval(shuffleInterval);
+
+        // Pick final results — make sure payer and driver are different if possible
+        var members = appData.members.slice();
+        var payerIdx = Math.floor(Math.random() * members.length);
+        rolledPayer = members[payerIdx];
+
+        if (members.length > 1) {
+          var driverPool = members.slice();
+          driverPool.splice(payerIdx, 1);
+          rolledDriver = driverPool[Math.floor(Math.random() * driverPool.length)];
+        } else {
+          rolledDriver = rolledPayer;
+        }
+
+        payerEl.textContent = rolledPayer;
+        driverEl.textContent = rolledDriver;
+        payerEl.classList.remove("spinning");
+        driverEl.classList.remove("spinning");
+        diceBtn.classList.remove("rolling");
+        acceptEl.classList.add("show");
+      }
+    }, 80);
+  }
+
+  function acceptRoll() {
+    if (rolledPayer) document.getElementById("payer").value = rolledPayer;
+    if (rolledDriver) document.getElementById("driver").value = rolledDriver;
+    document.getElementById("dice-accept").classList.remove("show");
+  }
+
   // Init
   buildTabs();
   document.getElementById("lunch-date").value = new Date().toISOString().split("T")[0];
@@ -1012,6 +1171,15 @@
   });
   document.getElementById("btn-save").addEventListener("click", function() {
     saveLunch();
+  });
+  document.getElementById("btn-roll").addEventListener("click", function() {
+    rollDice();
+  });
+  document.getElementById("btn-accept-roll").addEventListener("click", function() {
+    acceptRoll();
+  });
+  document.getElementById("btn-reroll").addEventListener("click", function() {
+    rollDice();
   });
 
   // Load data and auto-refresh every 15 seconds
