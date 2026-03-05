@@ -347,7 +347,7 @@
           </div>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <div style="font-weight:700;font-size:1.1rem">Grand Total: <span id="grand-total">$0.00</span></div>
+          <div style="font-weight:700;font-size:1.1rem">Total (Order + Tax + Tips): <span id="grand-total">$0.00</span></div>
           <button class="btn btn-primary btn-sm" id="btn-split">Split Evenly</button>
         </div>
       </div>
@@ -851,6 +851,8 @@
       loadAllData();
     });
 
+    // Reset everything for next entry
+    document.getElementById("lunch-date").value = new Date().toISOString().split("T")[0];
     document.getElementById("lunch-place").value = "";
     document.getElementById("payer").value = "";
     document.getElementById("driver").value = "";
@@ -860,6 +862,7 @@
     orderMembers = [];
     populateOrdererDropdown();
     document.getElementById("grand-total").textContent = "$0.00";
+    document.getElementById("order-total").textContent = "$0.00";
     renderOrders();
     alert("Lunch saved!");
   }
