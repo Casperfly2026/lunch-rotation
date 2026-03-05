@@ -268,29 +268,6 @@
     gap: 12px;
   }
   .suggestion-box strong { color: #065f46; }
-  .reminder-card {
-    background: linear-gradient(135deg, #fef2f2, #fecaca);
-    border: 2px solid #ef4444;
-    border-radius: var(--radius);
-    padding: 16px 20px;
-    margin-bottom: 20px;
-  }
-  .reminder-card h3 {
-    font-size: 1rem;
-    color: #991b1b;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .reminder-item {
-    font-size: 0.9rem;
-    color: #7f1d1d;
-    padding: 6px 0;
-    border-bottom: 1px solid rgba(239,68,68,0.15);
-  }
-  .reminder-item:last-child { border-bottom: none; }
-  .reminder-item strong { color: #991b1b; }
   .empty-state {
     text-align: center;
     padding: 40px 20px;
@@ -426,7 +403,6 @@
         <button class="btn btn-sm" id="btn-reroll" style="background:var(--gray-200);color:var(--gray-700)">Re-roll</button>
       </div>
     </div>
-    <div id="reminders"></div>
     <div id="suggestion"></div>
     <div class="card">
       <h2>Log a Lunch</h2>
@@ -534,8 +510,18 @@
   // REST API helpers
   function fbGet(path, callback) {
     fetch(DB_URL + "/" + path + ".json")
-      .then(function(res) { return res.json(); })
-      .then(function(data) { callback(null, data); })
+      .then(function(res) {
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status + ": " + res.statusText);
+        }
+        return res.json();
+      })
+      .then(function(data) {
+        if (data && data.error) {
+          throw new Error(data.error);
+        }
+        callback(null, data);
+      })
       .catch(function(err) { callback(err, null); });
   }
 
@@ -591,7 +577,7 @@
   function loadAllData(callback) {
     fbGet("", function(err, data) {
       if (err) {
-        statusEl.textContent = "Offline - using local cache";
+        statusEl.textContent = "Offline - " + (err.message || err);
         statusEl.className = "sync-status disconnected";
         if (callback) callback();
         return;
@@ -629,7 +615,6 @@
   function onDataChanged() {
     populateDropdowns();
     renderOrders();
-    renderReminders();
     renderSuggestion();
     if (currentTab === "history") renderHistory();
     if (currentTab === "stats") renderStats();
