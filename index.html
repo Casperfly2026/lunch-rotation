@@ -363,6 +363,35 @@
     border-radius: 4px;
   }
   .delete-btn:hover { color: var(--danger); background: var(--danger-bg); }
+  .edit-btn {
+    cursor: pointer;
+    color: var(--gray-400);
+    background: none;
+    border: none;
+    font-size: 0.85rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .edit-btn:hover { color: var(--primary); background: var(--primary-bg); }
+  .edit-row { background: var(--primary-bg) !important; }
+  .edit-row td { padding: 12px !important; }
+  .edit-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .edit-form-grid label { font-size: 0.78rem; margin-bottom: 2px; }
+  .edit-form-grid input,
+  .edit-form-grid select { padding: 6px 8px; font-size: 0.85rem; }
+  .edit-order-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .edit-order-row input { padding: 5px 8px; font-size: 0.85rem; }
   .hidden { display: none; }
   @media (max-width: 600px) {
     .form-row { grid-template-columns: 1fr; }
@@ -1035,6 +1064,8 @@
   };
 
   // History
+  var editingKey = null;
+
   function renderHistory() {
     var container = document.getElementById("history-content");
     if (appData.lunches.length === 0) {
@@ -1046,17 +1077,53 @@
       '</tr></thead><tbody>';
     for (var i = 0; i < appData.lunches.length; i++) {
       var l = appData.lunches[i];
+      var key = l.firebaseKey ? l.firebaseKey : "";
+
+      // If this row is being edited, show edit form
+      if (editingKey && editingKey === key) {
+        html += '<tr class="edit-row"><td colspan="7">';
+        html += '<div class="edit-form-grid">';
+        html += '<div><label>Date</label><input type="date" id="edit-date" value="' + esc(l.date || "") + '"></div>';
+        html += '<div><label>Place</label><input type="text" id="edit-place" value="' + esc(l.place || "") + '"></div>';
+        html += '<div><label>Payer</label><select id="edit-payer">';
+        for (var p = 0; p < appData.members.length; p++) {
+          html += '<option value="' + esc(appData.members[p]) + '"' + (appData.members[p] === l.payer ? ' selected' : '') + '>' + esc(appData.members[p]) + '</option>';
+        }
+        html += '</select></div>';
+        html += '<div><label>Driver</label><select id="edit-driver">';
+        for (var d = 0; d < appData.members.length; d++) {
+          html += '<option value="' + esc(appData.members[d]) + '"' + (appData.members[d] === l.driver ? ' selected' : '') + '>' + esc(appData.members[d]) + '</option>';
+        }
+        html += '</select></div>';
+        html += '</div>';
+        html += '<div style="margin-bottom:8px;font-weight:600;font-size:0.85rem">Orders:</div>';
+        var orders = l.orders || [];
+        for (var oi = 0; oi < orders.length; oi++) {
+          var o = orders[oi];
+          html += '<div class="edit-order-row">' +
+            '<strong style="font-size:0.85rem">' + esc(o.name) + '</strong>' +
+            '<input type="text" id="edit-item-' + oi + '" value="' + esc(o.item || "") + '" placeholder="Order item...">' +
+            '<input type="number" id="edit-cost-' + oi + '" value="' + (o.cost || 0).toFixed(2) + '" step="0.01" min="0" style="width:90px" placeholder="$0.00">' +
+            '</div>';
+        }
+        html += '<div style="margin-top:10px;display:flex;gap:8px">' +
+          '<button class="btn btn-success btn-sm" onclick="saveEdit(\'' + key + '\',' + orders.length + ')">Save</button>' +
+          '<button class="btn btn-sm" onclick="cancelEdit()" style="background:var(--gray-200);color:var(--gray-700)">Cancel</button>' +
+          '</div>';
+        html += '</td></tr>';
+        continue;
+      }
+
       var orderParts = [];
       if (l.orders) {
         for (var j = 0; j < l.orders.length; j++) {
-          var o = l.orders[j];
-          var line = esc(o.name);
-          if (o.item) line += ": " + esc(o.item);
-          if (o.cost) line += " ($" + o.cost.toFixed(2) + ")";
+          var ord = l.orders[j];
+          var line = esc(ord.name);
+          if (ord.item) line += ": " + esc(ord.item);
+          if (ord.cost) line += " ($" + ord.cost.toFixed(2) + ")";
           orderParts.push(line);
         }
       }
-      var key = l.firebaseKey ? l.firebaseKey : "";
       var payerVenmo = appData.venmo[l.payer] || "";
       var venmoPayLink = "";
       if (payerVenmo) {
@@ -1069,12 +1136,70 @@
         '<td><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
         '<td style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
         '<td><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
-        '<td><button class="delete-btn" onclick="deleteLunchByKey(\'' + key + '\')" title="Delete">X</button></td>' +
+        '<td>' +
+          '<button class="edit-btn" onclick="editLunch(\'' + key + '\')" title="Edit">Edit</button> ' +
+          '<button class="delete-btn" onclick="deleteLunchByKey(\'' + key + '\')" title="Delete">X</button>' +
+        '</td>' +
         '</tr>';
     }
     html += '</tbody></table>';
     container.innerHTML = html;
   }
+
+  window.editLunch = function(key) {
+    editingKey = key;
+    renderHistory();
+  };
+
+  window.cancelEdit = function() {
+    editingKey = null;
+    renderHistory();
+  };
+
+  window.saveEdit = function(key, orderCount) {
+    var newDate = document.getElementById("edit-date").value;
+    var newPlace = document.getElementById("edit-place").value.trim();
+    var newPayer = document.getElementById("edit-payer").value;
+    var newDriver = document.getElementById("edit-driver").value;
+
+    // Find the original lunch to get order names
+    var origLunch = null;
+    for (var i = 0; i < appData.lunches.length; i++) {
+      if (appData.lunches[i].firebaseKey === key) {
+        origLunch = appData.lunches[i];
+        break;
+      }
+    }
+    if (!origLunch) return;
+
+    var newOrders = [];
+    var newTotal = 0;
+    for (var j = 0; j < orderCount; j++) {
+      var item = document.getElementById("edit-item-" + j).value.trim();
+      var cost = parseFloat(document.getElementById("edit-cost-" + j).value) || 0;
+      newOrders.push({ name: origLunch.orders[j].name, item: item, cost: cost });
+      newTotal += cost;
+    }
+
+    // If original had a bulk total larger than individual sum, keep the larger one
+    if (origLunch.total > newTotal && origLunch.tax) {
+      newTotal = origLunch.total;
+    }
+
+    var updates = {
+      date: newDate,
+      place: newPlace,
+      payer: newPayer,
+      driver: newDriver,
+      orders: newOrders,
+      total: newTotal
+    };
+
+    fbPatch("lunches/" + key, updates, function() {
+      editingKey = null;
+      loadAllData();
+    });
+  };
 
   // Stats
   function renderStats() {
