@@ -573,6 +573,22 @@
     return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
   }
 
+  // Firebase sometimes returns arrays as objects with numeric keys
+  // This helper ensures we always get a proper array
+  function toArray(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (typeof val === "object") {
+      var arr = [];
+      var keys = Object.keys(val);
+      for (var i = 0; i < keys.length; i++) {
+        arr.push(val[keys[i]]);
+      }
+      return arr;
+    }
+    return [];
+  }
+
   // Load all data from Firebase
   function loadAllData(callback) {
     fbGet("", function(err, data) {
@@ -587,7 +603,7 @@
       statusEl.className = "sync-status connected";
 
       if (data) {
-        appData.members = data.members || [];
+        appData.members = toArray(data.members);
         appData.venmo = data.venmo || {};
 
         if (data.lunches) {
@@ -596,6 +612,7 @@
           for (var i = 0; i < keys.length; i++) {
             var lunch = data.lunches[keys[i]];
             lunch.firebaseKey = keys[i];
+            lunch.orders = toArray(lunch.orders);
             arr.push(lunch);
           }
           arr.sort(function(a, b) { return String(b.date).localeCompare(String(a.date)); });
