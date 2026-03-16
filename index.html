@@ -458,26 +458,6 @@
     </div>
     <div class="card">
       <h2>Orders</h2>
-      <div style="background:var(--gray-50);border-radius:8px;padding:14px;margin-bottom:16px">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
-          <div>
-            <label>Order Total $</label>
-            <input type="number" id="bulk-total" placeholder="0.00" min="0" step="0.01" oninput="updateGrandTotal()">
-          </div>
-          <div>
-            <label>Tax $</label>
-            <input type="number" id="bulk-tax" placeholder="0.00" min="0" step="0.01" oninput="updateGrandTotal()">
-          </div>
-          <div>
-            <label>Tips $</label>
-            <input type="number" id="bulk-tips" placeholder="0.00" min="0" step="0.01" oninput="updateGrandTotal()">
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
-          <div style="font-weight:700;font-size:1.1rem">Total (Order + Tax + Tips): <span id="grand-total">$0.00</span></div>
-          <button class="btn btn-primary btn-sm" id="btn-split">Split Evenly</button>
-        </div>
-      </div>
       <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">
         <div style="flex:1">
           <label>Add person to this order (select to add)</label>
@@ -486,8 +466,23 @@
         <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
       </div>
       <div id="orders-list"></div>
+      <div style="background:var(--gray-50);border-radius:8px;padding:14px;margin-top:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label>Tax $</label>
+            <input type="number" id="bulk-tax" placeholder="0.00" min="0" step="0.01" oninput="recalcAll()">
+          </div>
+          <div>
+            <label>Tips $</label>
+            <input type="number" id="bulk-tips" placeholder="0.00" min="0" step="0.01" oninput="recalcAll()">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="font-size:0.85rem;color:var(--gray-500)">Tax &amp; tips are split proportionally based on each person's food cost</div>
+        </div>
+      </div>
       <div class="total-row">
-        <span>Individual Total</span>
+        <span>Grand Total</span>
         <span id="order-total">$0.00</span>
       </div>
     </div>
@@ -846,72 +841,62 @@
     renderOrders();
   };
 
-  // Orders - grand total from top inputs
-  window.updateGrandTotal = function() {
-    var orderTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
+  // Recalculate all per-person totals with tax/tip, and grand total
+  window.recalcAll = function() {
     var tax = parseFloat(document.getElementById("bulk-tax").value) || 0;
     var tips = parseFloat(document.getElementById("bulk-tips").value) || 0;
-    var grand = orderTotal + tax + tips;
-    document.getElementById("grand-total").textContent = "$" + grand.toFixed(2);
-  };
 
-  // Split evenly among people in today's order
-  window.splitEvenly = function() {
-    var orderTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
-    var tax = parseFloat(document.getElementById("bulk-tax").value) || 0;
-    var tips = parseFloat(document.getElementById("bulk-tips").value) || 0;
-    var grand = orderTotal + tax + tips;
-
-    if (grand <= 0) {
-      alert("Please enter the order total first.");
-      return;
-    }
-    if (orderMembers.length === 0) {
-      alert("Add people to the order first.");
-      return;
-    }
-
-    var perPerson = Math.round((grand / orderMembers.length) * 100) / 100;
-    for (var j = 0; j < orderMembers.length; j++) {
-      var costInput = document.getElementById("order-cost-" + j);
-      if (costInput) {
-        costInput.value = perPerson.toFixed(2);
-      }
-    }
-    window.updateTotal();
-  };
-
-  // Individual totals
-  window.updateTotal = function() {
-    var total = 0;
+    // Sum all food costs
+    var foodTotal = 0;
     for (var i = 0; i < orderMembers.length; i++) {
-      var cost = document.getElementById("order-cost-" + i);
-      if (cost && parseFloat(cost.value)) {
-        total += parseFloat(cost.value);
+      var el = document.getElementById("order-cost-" + i);
+      if (el) foodTotal += (parseFloat(el.value) || 0);
+    }
+
+    // Update each person's total (food + proportional tax + proportional tip)
+    var grandTotal = 0;
+    for (var j = 0; j < orderMembers.length; j++) {
+      var costEl = document.getElementById("order-cost-" + j);
+      var totalEl = document.getElementById("order-total-" + j);
+      if (!costEl || !totalEl) continue;
+      var food = parseFloat(costEl.value) || 0;
+      var share = foodTotal > 0 ? (food / foodTotal) : 0;
+      var personTotal = food + (tax * share) + (tips * share);
+      personTotal = Math.round(personTotal * 100) / 100;
+      grandTotal += personTotal;
+      if (tax > 0 || tips > 0) {
+        totalEl.textContent = "= $" + personTotal.toFixed(2);
+        totalEl.style.display = "inline";
+      } else {
+        totalEl.style.display = "none";
       }
     }
-    document.getElementById("order-total").textContent = "$" + total.toFixed(2);
+
+    // Grand total = food + tax + tips
+    if (grandTotal === 0) grandTotal = foodTotal + tax + tips;
+    document.getElementById("order-total").textContent = "$" + grandTotal.toFixed(2);
   };
 
   function renderOrders() {
     var container = document.getElementById("orders-list");
     if (orderMembers.length === 0) {
       container.innerHTML = '<div class="empty-state"><p>Add people to this order using the dropdown above.</p></div>';
+      document.getElementById("order-total").textContent = "$0.00";
       return;
     }
     var html = "";
     for (var i = 0; i < orderMembers.length; i++) {
-      html += '<div class="order-entry">' +
+      html += '<div class="order-entry" style="grid-template-columns:1fr auto auto">' +
         '<div class="order-check">' +
           '<strong style="font-size:0.95rem">' + esc(orderMembers[i]) + '</strong>' +
           '<button class="remove-btn" onclick="removeOrderer(' + i + ')" title="Remove" style="margin-left:4px;font-size:0.85rem;padding:2px 6px">&times;</button>' +
         '</div>' +
-        '<input type="text" id="order-item-' + i + '" placeholder="What they are ordering...">' +
-        '<input type="number" id="order-cost-' + i + '" placeholder="$0.00" min="0" step="0.01" oninput="updateTotal()" style="width:100px">' +
+        '<input type="number" id="order-cost-' + i + '" placeholder="Food $" min="0" step="0.01" oninput="recalcAll()" style="width:100px">' +
+        '<span id="order-total-' + i + '" style="display:none;font-size:0.82rem;color:var(--primary);font-weight:600;min-width:70px;text-align:right"></span>' +
         '</div>';
     }
     container.innerHTML = html;
-    window.updateTotal();
+    window.recalcAll();
   }
 
   // Suggestion - uses count first, then recency to break ties
@@ -1000,27 +985,26 @@
     if (!payer) { alert("Please select who is paying."); return; }
     if (!driver) { alert("Please select who is driving."); return; }
 
+    var bulkTax = parseFloat(document.getElementById("bulk-tax").value) || 0;
+    var bulkTips = parseFloat(document.getElementById("bulk-tips").value) || 0;
+
+    // Calculate food total first for proportional split
+    var foodTotal = 0;
+    for (var fi = 0; fi < orderMembers.length; fi++) {
+      foodTotal += parseFloat(document.getElementById("order-cost-" + fi).value) || 0;
+    }
+
     var orders = [];
+    var total = 0;
     for (var i = 0; i < orderMembers.length; i++) {
-      var item = document.getElementById("order-item-" + i).value.trim();
-      var cost = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
-      orders.push({ name: orderMembers[i], item: item, cost: cost });
+      var food = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
+      var share = foodTotal > 0 ? (food / foodTotal) : 0;
+      var personTotal = Math.round((food + (bulkTax * share) + (bulkTips * share)) * 100) / 100;
+      orders.push({ name: orderMembers[i], food: food, cost: personTotal });
+      total += personTotal;
     }
 
     if (orders.length === 0) { alert("Add at least one person to the order."); return; }
-
-    // Use grand total if filled, otherwise sum individual costs
-    var bulkTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
-    var bulkTax = parseFloat(document.getElementById("bulk-tax").value) || 0;
-    var bulkTips = parseFloat(document.getElementById("bulk-tips").value) || 0;
-    var grandTotal = bulkTotal + bulkTax + bulkTips;
-
-    var total = 0;
-    if (grandTotal > 0) {
-      total = grandTotal;
-    } else {
-      for (var j = 0; j < orders.length; j++) total += orders[j].cost;
-    }
 
     var lunchData = {
       date: date,
@@ -1042,12 +1026,10 @@
         document.getElementById("lunch-place").value = "";
         document.getElementById("payer").value = "";
         document.getElementById("driver").value = "";
-        document.getElementById("bulk-total").value = "";
         document.getElementById("bulk-tax").value = "";
         document.getElementById("bulk-tips").value = "";
         orderMembers = [];
         populateOrdererDropdown();
-        document.getElementById("grand-total").textContent = "$0.00";
         document.getElementById("order-total").textContent = "$0.00";
         renderOrders();
         alert("Lunch saved!");
@@ -1096,14 +1078,14 @@
         }
         html += '</select></div>';
         html += '</div>';
-        html += '<div style="margin-bottom:8px;font-weight:600;font-size:0.85rem">Orders:</div>';
+        html += '<div style="margin-bottom:8px;font-weight:600;font-size:0.85rem">Orders (food cost per person):</div>';
         var orders = l.orders || [];
         for (var oi = 0; oi < orders.length; oi++) {
           var o = orders[oi];
-          html += '<div class="edit-order-row">' +
+          var editCostVal = (o.food ? o.food : o.cost || 0).toFixed(2);
+          html += '<div class="edit-order-row" style="grid-template-columns:1fr auto">' +
             '<strong style="font-size:0.85rem">' + esc(o.name) + '</strong>' +
-            '<input type="text" id="edit-item-' + oi + '" value="' + esc(o.item || "") + '" placeholder="Order item...">' +
-            '<input type="number" id="edit-cost-' + oi + '" value="' + (o.cost || 0).toFixed(2) + '" step="0.01" min="0" style="width:90px" placeholder="$0.00">' +
+            '<input type="number" id="edit-cost-' + oi + '" value="' + editCostVal + '" step="0.01" min="0" style="width:100px" placeholder="$0.00">' +
             '</div>';
         }
         html += '<div style="margin-top:10px;display:flex;gap:8px">' +
@@ -1119,8 +1101,11 @@
         for (var j = 0; j < l.orders.length; j++) {
           var ord = l.orders[j];
           var line = esc(ord.name);
-          if (ord.item) line += ": " + esc(ord.item);
-          if (ord.cost) line += " ($" + ord.cost.toFixed(2) + ")";
+          if (ord.food && ord.cost && ord.food !== ord.cost) {
+            line += " ($" + ord.food.toFixed(2) + " + tax/tip = $" + ord.cost.toFixed(2) + ")";
+          } else if (ord.cost) {
+            line += " ($" + ord.cost.toFixed(2) + ")";
+          }
           orderParts.push(line);
         }
       }
@@ -1175,15 +1160,9 @@
     var newOrders = [];
     var newTotal = 0;
     for (var j = 0; j < orderCount; j++) {
-      var item = document.getElementById("edit-item-" + j).value.trim();
       var cost = parseFloat(document.getElementById("edit-cost-" + j).value) || 0;
-      newOrders.push({ name: origLunch.orders[j].name, item: item, cost: cost });
+      newOrders.push({ name: origLunch.orders[j].name, food: cost, cost: cost });
       newTotal += cost;
-    }
-
-    // If original had a bulk total larger than individual sum, keep the larger one
-    if (origLunch.total > newTotal && origLunch.tax) {
-      newTotal = origLunch.total;
     }
 
     var updates = {
@@ -1351,9 +1330,6 @@
   });
   document.getElementById("btn-add-all").addEventListener("click", function() {
     window.addAllOrderers();
-  });
-  document.getElementById("btn-split").addEventListener("click", function() {
-    window.splitEvenly();
   });
   document.getElementById("btn-save").addEventListener("click", function() {
     saveLunch();
