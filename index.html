@@ -487,9 +487,7 @@
         </div>
         <div id="orders-list"></div>
       </div>
-      <div style="background:var(--warning-bg);border-radius:8px;padding:10px 14px;font-size:0.82rem;color:#92400e;margin-bottom:8px" id="tax-tip-note">
-        Tax is applied as a ratio (tax / order total) on each person's amount. Tips are split evenly.
-      </div>
+      <div id="validation-msg" style="display:none;border-radius:8px;padding:10px 14px;font-size:0.85rem;margin-bottom:8px"></div>
       <div class="total-row">
         <span>Sum of Individual Totals</span>
         <span id="order-total">$0.00</span>
@@ -860,57 +858,59 @@
     var billTotal = orderTotal + tax + tips;
     document.getElementById("grand-total").textContent = "$" + billTotal.toFixed(2);
 
-    // Tax ratio = tax / order total (e.g. 8% if tax is $4 on $50 order)
+    // Tax ratio = tax / order total
     var taxRate = orderTotal > 0 ? (tax / orderTotal) : 0;
 
-    // Tips split evenly among all people in the order
+    // Tips split evenly
     var tipPerPerson = orderMembers.length > 0 ? (tips / orderMembers.length) : 0;
 
-    // Calculate each person's total
+    // Calculate each person's columns
     var sumIndividual = 0;
-    var peopleCount = 0;
+    var sumFood = 0;
     for (var j = 0; j < orderMembers.length; j++) {
       var costEl = document.getElementById("order-cost-" + j);
+      var taxEl = document.getElementById("order-tax-" + j);
+      var tipEl = document.getElementById("order-tip-" + j);
       var totalEl = document.getElementById("order-total-" + j);
-      if (!costEl || !totalEl) continue;
-      var food = parseFloat(costEl.value) || 0;
-      if (food > 0) peopleCount++;
+      if (!costEl) continue;
 
-      // person owes: food + (food * taxRate) + tipPerPerson
+      var food = parseFloat(costEl.value) || 0;
+      sumFood += food;
       var personTax = Math.round((food * taxRate) * 100) / 100;
       var personTip = Math.round(tipPerPerson * 100) / 100;
       var personTotal = Math.round((food + personTax + personTip) * 100) / 100;
       sumIndividual += personTotal;
 
-      if (food > 0 && (tax > 0 || tips > 0)) {
-        var breakdown = "";
-        if (tax > 0 && tips > 0) {
-          breakdown = "+ $" + personTax.toFixed(2) + " tax + $" + personTip.toFixed(2) + " tip = $" + personTotal.toFixed(2);
-        } else if (tax > 0) {
-          breakdown = "+ $" + personTax.toFixed(2) + " tax = $" + personTotal.toFixed(2);
-        } else {
-          breakdown = "+ $" + personTip.toFixed(2) + " tip = $" + personTotal.toFixed(2);
-        }
-        totalEl.textContent = breakdown;
-        totalEl.style.display = "inline";
-      } else {
-        totalEl.style.display = "none";
-      }
-    }
-
-    // Show tax rate info
-    var noteEl = document.getElementById("tax-tip-note");
-    if (noteEl) {
-      if (taxRate > 0) {
-        noteEl.textContent = "Tax rate: " + (taxRate * 100).toFixed(1) + "% applied to each person's food. Tips: $" + tipPerPerson.toFixed(2) + "/person.";
-      } else if (tips > 0 && orderMembers.length > 0) {
-        noteEl.textContent = "Tips: $" + tipPerPerson.toFixed(2) + "/person.";
-      } else {
-        noteEl.textContent = "Tax is applied as a ratio (tax / order total) on each person's amount. Tips are split evenly.";
-      }
+      if (taxEl) taxEl.textContent = food > 0 ? "$" + personTax.toFixed(2) : "-";
+      if (tipEl) tipEl.textContent = food > 0 ? "$" + personTip.toFixed(2) : "-";
+      if (totalEl) totalEl.textContent = food > 0 ? "$" + personTotal.toFixed(2) : "-";
     }
 
     document.getElementById("order-total").textContent = "$" + sumIndividual.toFixed(2);
+
+    // Validation: compare sum of individual totals to bill total
+    var msgEl = document.getElementById("validation-msg");
+    if (!msgEl) return;
+    if (billTotal > 0 && sumFood > 0) {
+      var diff = Math.abs(billTotal - sumIndividual);
+      if (diff < 0.02) {
+        // Match
+        msgEl.style.display = "block";
+        msgEl.style.background = "var(--success-bg)";
+        msgEl.style.color = "#065f46";
+        msgEl.innerHTML = "&#10003; Individual totals match the bill total. All good!";
+      } else {
+        // Mismatch
+        var offBy = (sumIndividual - billTotal).toFixed(2);
+        var direction = sumIndividual > billTotal ? "over" : "under";
+        msgEl.style.display = "block";
+        msgEl.style.background = "var(--danger-bg)";
+        msgEl.style.color = "#991b1b";
+        msgEl.innerHTML = "&#9888; Individual totals ($" + sumIndividual.toFixed(2) + ") are $" + Math.abs(offBy).toString() + " " + direction + " the bill total ($" + billTotal.toFixed(2) + "). Please check the amounts.";
+      }
+    } else {
+      msgEl.style.display = "none";
+    }
   };
 
   function renderOrders() {
@@ -920,15 +920,16 @@
       document.getElementById("order-total").textContent = "$0.00";
       return;
     }
-    var html = "";
+    var html = '<div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr auto;gap:4px 8px;align-items:center;font-size:0.82rem;color:var(--gray-500);padding:0 0 6px;border-bottom:1px solid var(--gray-200);margin-bottom:4px">' +
+      '<span></span><span>Food $</span><span>Tax $</span><span>Tip $</span><span style="font-weight:600;color:var(--gray-700)">Total $</span><span></span></div>';
     for (var i = 0; i < orderMembers.length; i++) {
-      html += '<div class="order-entry" style="grid-template-columns:1fr auto auto">' +
-        '<div class="order-check">' +
-          '<strong style="font-size:0.95rem">' + esc(orderMembers[i]) + '</strong>' +
-          '<button class="remove-btn" onclick="removeOrderer(' + i + ')" title="Remove" style="margin-left:4px;font-size:0.85rem;padding:2px 6px">&times;</button>' +
-        '</div>' +
-        '<input type="number" id="order-cost-' + i + '" placeholder="Food $" min="0" step="0.01" oninput="recalcAll()" style="width:100px">' +
-        '<span id="order-total-' + i + '" style="display:none;font-size:0.82rem;color:var(--primary);font-weight:600;min-width:70px;text-align:right"></span>' +
+      html += '<div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr auto;gap:4px 8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--gray-100)">' +
+        '<strong style="font-size:0.9rem;min-width:60px">' + esc(orderMembers[i]) + '</strong>' +
+        '<input type="number" id="order-cost-' + i + '" placeholder="0.00" min="0" step="0.01" oninput="recalcAll()" style="width:100%;padding:6px 8px;font-size:0.9rem">' +
+        '<span id="order-tax-' + i + '" style="font-size:0.85rem;color:var(--gray-500);text-align:center">-</span>' +
+        '<span id="order-tip-' + i + '" style="font-size:0.85rem;color:var(--gray-500);text-align:center">-</span>' +
+        '<span id="order-total-' + i + '" style="font-size:0.9rem;font-weight:700;color:var(--primary);text-align:center">-</span>' +
+        '<button class="remove-btn" onclick="removeOrderer(' + i + ')" title="Remove" style="font-size:0.85rem;padding:2px 6px">&times;</button>' +
         '</div>';
     }
     container.innerHTML = html;
