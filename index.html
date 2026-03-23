@@ -458,15 +458,8 @@
     </div>
     <div class="card">
       <h2>Orders</h2>
-      <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">
-        <div style="flex:1">
-          <label>Add person to this order (select to add)</label>
-          <select id="add-orderer"><option value="">Select member...</option></select>
-        </div>
-        <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
-      </div>
-      <div id="orders-list"></div>
-      <div style="background:var(--gray-50);border-radius:8px;padding:14px;margin-top:12px">
+      <div style="background:var(--gray-50);border-radius:8px;padding:14px;margin-bottom:16px">
+        <div style="font-weight:600;font-size:0.9rem;margin-bottom:10px;color:var(--gray-700)">Step 1: Enter the bill totals</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
           <div>
             <label>Order Total $</label>
@@ -481,11 +474,24 @@
             <input type="number" id="bulk-tips" placeholder="0.00" min="0" step="0.01" oninput="recalcAll()">
           </div>
         </div>
-        <div style="font-weight:700;font-size:1.1rem;margin-bottom:6px">Total (Order + Tax + Tips): <span id="grand-total">$0.00</span></div>
-        <div style="font-size:0.82rem;color:var(--gray-500)">Enter each person's food cost below. Tax &amp; tips auto-split proportionally. Or leave individual costs blank and use Order Total to split evenly.</div>
+        <div style="font-weight:700;font-size:1.1rem">Bill Total: <span id="grand-total">$0.00</span></div>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;color:var(--gray-700)">Step 2: Add people &amp; enter each person's food amount</div>
+        <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">
+          <div style="flex:1">
+            <label>Add person (select to add)</label>
+            <select id="add-orderer"><option value="">Select member...</option></select>
+          </div>
+          <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
+        </div>
+        <div id="orders-list"></div>
+      </div>
+      <div style="background:var(--warning-bg);border-radius:8px;padding:10px 14px;font-size:0.82rem;color:#92400e;margin-bottom:8px" id="tax-tip-note">
+        Tax is applied as a ratio (tax / order total) on each person's amount. Tips are split evenly.
       </div>
       <div class="total-row">
-        <span>Grand Total</span>
+        <span>Sum of Individual Totals</span>
         <span id="order-total">$0.00</span>
       </div>
     </div>
@@ -844,45 +850,67 @@
     renderOrders();
   };
 
-  // Recalculate all per-person totals with tax/tip, and grand total
+  // Recalculate: tax as ratio on each person's food, tips split evenly
   window.recalcAll = function() {
     var orderTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
     var tax = parseFloat(document.getElementById("bulk-tax").value) || 0;
     var tips = parseFloat(document.getElementById("bulk-tips").value) || 0;
 
-    // Update grand total display
-    var grandDisplay = orderTotal + tax + tips;
-    document.getElementById("grand-total").textContent = "$" + grandDisplay.toFixed(2);
+    // Update bill total display
+    var billTotal = orderTotal + tax + tips;
+    document.getElementById("grand-total").textContent = "$" + billTotal.toFixed(2);
 
-    // Sum all individual food costs
-    var foodTotal = 0;
-    for (var i = 0; i < orderMembers.length; i++) {
-      var el = document.getElementById("order-cost-" + i);
-      if (el) foodTotal += (parseFloat(el.value) || 0);
-    }
+    // Tax ratio = tax / order total (e.g. 8% if tax is $4 on $50 order)
+    var taxRate = orderTotal > 0 ? (tax / orderTotal) : 0;
 
-    // Update each person's total (food + proportional tax + proportional tip)
-    var personGrandTotal = 0;
+    // Tips split evenly among all people in the order
+    var tipPerPerson = orderMembers.length > 0 ? (tips / orderMembers.length) : 0;
+
+    // Calculate each person's total
+    var sumIndividual = 0;
+    var peopleCount = 0;
     for (var j = 0; j < orderMembers.length; j++) {
       var costEl = document.getElementById("order-cost-" + j);
       var totalEl = document.getElementById("order-total-" + j);
       if (!costEl || !totalEl) continue;
       var food = parseFloat(costEl.value) || 0;
-      var share = foodTotal > 0 ? (food / foodTotal) : 0;
-      var personTotal = food + (tax * share) + (tips * share);
-      personTotal = Math.round(personTotal * 100) / 100;
-      personGrandTotal += personTotal;
-      if (tax > 0 || tips > 0) {
-        totalEl.textContent = "= $" + personTotal.toFixed(2);
+      if (food > 0) peopleCount++;
+
+      // person owes: food + (food * taxRate) + tipPerPerson
+      var personTax = Math.round((food * taxRate) * 100) / 100;
+      var personTip = Math.round(tipPerPerson * 100) / 100;
+      var personTotal = Math.round((food + personTax + personTip) * 100) / 100;
+      sumIndividual += personTotal;
+
+      if (food > 0 && (tax > 0 || tips > 0)) {
+        var breakdown = "";
+        if (tax > 0 && tips > 0) {
+          breakdown = "+ $" + personTax.toFixed(2) + " tax + $" + personTip.toFixed(2) + " tip = $" + personTotal.toFixed(2);
+        } else if (tax > 0) {
+          breakdown = "+ $" + personTax.toFixed(2) + " tax = $" + personTotal.toFixed(2);
+        } else {
+          breakdown = "+ $" + personTip.toFixed(2) + " tip = $" + personTotal.toFixed(2);
+        }
+        totalEl.textContent = breakdown;
         totalEl.style.display = "inline";
       } else {
         totalEl.style.display = "none";
       }
     }
 
-    // Grand total: use individual totals if available, otherwise use top fields
-    var finalTotal = personGrandTotal > 0 ? personGrandTotal : grandDisplay;
-    document.getElementById("order-total").textContent = "$" + finalTotal.toFixed(2);
+    // Show tax rate info
+    var noteEl = document.getElementById("tax-tip-note");
+    if (noteEl) {
+      if (taxRate > 0) {
+        noteEl.textContent = "Tax rate: " + (taxRate * 100).toFixed(1) + "% applied to each person's food. Tips: $" + tipPerPerson.toFixed(2) + "/person.";
+      } else if (tips > 0 && orderMembers.length > 0) {
+        noteEl.textContent = "Tips: $" + tipPerPerson.toFixed(2) + "/person.";
+      } else {
+        noteEl.textContent = "Tax is applied as a ratio (tax / order total) on each person's amount. Tips are split evenly.";
+      }
+    }
+
+    document.getElementById("order-total").textContent = "$" + sumIndividual.toFixed(2);
   };
 
   function renderOrders() {
@@ -996,38 +1024,21 @@
     var bulkTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
     var bulkTax = parseFloat(document.getElementById("bulk-tax").value) || 0;
     var bulkTips = parseFloat(document.getElementById("bulk-tips").value) || 0;
-    var grandFromTop = bulkTotal + bulkTax + bulkTips;
+    var billTotal = bulkTotal + bulkTax + bulkTips;
 
-    // Calculate food total first for proportional split
-    var foodTotal = 0;
-    for (var fi = 0; fi < orderMembers.length; fi++) {
-      foodTotal += parseFloat(document.getElementById("order-cost-" + fi).value) || 0;
-    }
+    // Tax ratio and tip per person
+    var taxRate = bulkTotal > 0 ? (bulkTax / bulkTotal) : 0;
+    var tipPerPerson = orderMembers.length > 0 ? (bulkTips / orderMembers.length) : 0;
 
     var orders = [];
     var total = 0;
-
-    if (foodTotal > 0) {
-      // Individual costs entered: split tax/tips proportionally
-      for (var i = 0; i < orderMembers.length; i++) {
-        var food = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
-        var share = food / foodTotal;
-        var personTotal = Math.round((food + (bulkTax * share) + (bulkTips * share)) * 100) / 100;
-        orders.push({ name: orderMembers[i], food: food, cost: personTotal });
-        total += personTotal;
-      }
-    } else if (grandFromTop > 0 && orderMembers.length > 0) {
-      // No individual costs, but top total entered: split everything evenly
-      var perPerson = Math.round((grandFromTop / orderMembers.length) * 100) / 100;
-      var foodPer = Math.round((bulkTotal / orderMembers.length) * 100) / 100;
-      for (var k = 0; k < orderMembers.length; k++) {
-        orders.push({ name: orderMembers[k], food: foodPer, cost: perPerson });
-        total += perPerson;
-      }
-    } else {
-      for (var m = 0; m < orderMembers.length; m++) {
-        orders.push({ name: orderMembers[m], food: 0, cost: 0 });
-      }
+    for (var i = 0; i < orderMembers.length; i++) {
+      var food = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
+      var personTax = Math.round((food * taxRate) * 100) / 100;
+      var personTip = Math.round(tipPerPerson * 100) / 100;
+      var personTotal = Math.round((food + personTax + personTip) * 100) / 100;
+      orders.push({ name: orderMembers[i], food: food, cost: personTotal });
+      total += personTotal;
     }
 
     if (orders.length === 0) { alert("Add at least one person to the order."); return; }
@@ -1038,7 +1049,7 @@
       payer: payer,
       driver: driver,
       orders: orders,
-      total: total,
+      total: billTotal > 0 ? billTotal : total,
       tax: bulkTax,
       tips: bulkTips,
       id: Date.now()
