@@ -488,10 +488,7 @@
         <div id="orders-list"></div>
       </div>
       <div id="validation-msg" style="display:none;border-radius:8px;padding:10px 14px;font-size:0.85rem;margin-bottom:8px"></div>
-      <div class="total-row">
-        <span>Sum of Individual Totals</span>
-        <span id="order-total">$0.00</span>
-      </div>
+      <span id="order-total" style="display:none">$0.00</span>
     </div>
     <div style="text-align: right;">
       <button class="btn btn-success" id="btn-save">Save Lunch</button>
@@ -662,7 +659,10 @@
 
   function onDataChanged() {
     populateDropdowns();
-    renderOrders();
+    // Don't call renderOrders() here — the 15s polling would wipe out
+    // any values the user is typing in the per-person food inputs.
+    // Orders are rendered only when members are added/removed.
+    recalcAll();
     renderSuggestion();
     if (currentTab === "history") renderHistory();
     if (currentTab === "stats") renderStats();
