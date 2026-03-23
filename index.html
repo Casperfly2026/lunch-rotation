@@ -432,7 +432,6 @@
         <button class="btn btn-sm" id="btn-reroll" style="background:var(--gray-200);color:var(--gray-700)">Re-roll</button>
       </div>
     </div>
-    <div id="suggestion"></div>
     <div class="card">
       <h2>Log a Lunch</h2>
       <div class="form-row">
@@ -1016,16 +1015,7 @@
   }
 
   function renderSuggestion() {
-    var box = document.getElementById("suggestion");
-    var s = getSuggestion();
-    if (!s) { box.innerHTML = ""; return; }
-    box.innerHTML =
-      '<div class="suggestion-box">' +
-        '<div><strong>Tip:</strong></div>' +
-        '<div>Suggested next rotation: <strong>' + esc(s.payer) + '</strong> pays' +
-        (s.payer !== s.driver ? ' and <strong>' + esc(s.driver) + '</strong> drives' : ' and drives') +
-        ' (least turns so far)</div>' +
-      '</div>';
+    // Removed — suggestion was not accurate
   }
 
   // Save Lunch
