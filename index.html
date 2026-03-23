@@ -617,6 +617,22 @@
     return [];
   }
 
+  // If a lunch has orders but all individual costs are 0, split total evenly
+  function normalizeLunchOrders(lunch) {
+    if (!lunch.orders || lunch.orders.length === 0) return;
+    var sumCost = 0;
+    for (var i = 0; i < lunch.orders.length; i++) {
+      sumCost += (lunch.orders[i].cost || 0);
+    }
+    if (sumCost === 0 && lunch.total > 0 && lunch.orders.length > 0) {
+      var perPerson = Math.round((lunch.total / lunch.orders.length) * 100) / 100;
+      for (var j = 0; j < lunch.orders.length; j++) {
+        lunch.orders[j].cost = perPerson;
+        lunch.orders[j].food = perPerson;
+      }
+    }
+  }
+
   // Load all data from Firebase
   function loadAllData(callback) {
     fbGet("", function(err, data) {
@@ -641,6 +657,7 @@
             var lunch = data.lunches[keys[i]];
             lunch.firebaseKey = keys[i];
             lunch.orders = toArray(lunch.orders);
+            normalizeLunchOrders(lunch);
             arr.push(lunch);
           }
           arr.sort(function(a, b) { return String(b.date).localeCompare(String(a.date)); });
