@@ -356,6 +356,19 @@
     border-radius: 4px;
   }
   .delete-btn:hover { color: var(--danger); background: var(--danger-bg); }
+  .star-rating { display: inline-flex; gap: 2px; }
+  .star-rating .star {
+    cursor: pointer;
+    font-size: 1.3rem;
+    color: var(--gray-300);
+    background: none;
+    border: none;
+    padding: 0 1px;
+    transition: color 0.15s;
+  }
+  .star-rating .star.filled { color: #f59e0b; }
+  .star-rating .star:hover { color: #fbbf24; }
+  .avg-rating { font-size: 0.8rem; color: var(--gray-500); margin-left: 4px; }
   .edit-btn {
     cursor: pointer;
     color: var(--gray-400);
@@ -451,7 +464,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">
           <div>
             <label>Order Total $</label>
-            <input type="number" id="bulk-total" placeholder="0.00" min="0" step="0.01" oninput="recalcAll()">
+            <input type="number" id="bulk-total" placeholder="0.00" min="0" step="0.01" oninput="this.dataset.manual='1';recalcAll()">
           </div>
           <div>
             <label>Tax $</label>
@@ -856,9 +869,23 @@
 
   // Recalculate: tax as ratio on each person's food, tips split evenly
   window.recalcAll = function() {
-    var orderTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
+    var bulkTotalEl = document.getElementById("bulk-total");
+    var orderTotal = parseFloat(bulkTotalEl.value) || 0;
     var tax = parseFloat(document.getElementById("bulk-tax").value) || 0;
     var tips = parseFloat(document.getElementById("bulk-tips").value) || 0;
+
+    // Sum individual food costs
+    var sumFood = 0;
+    for (var s = 0; s < orderMembers.length; s++) {
+      var el = document.getElementById("order-cost-" + s);
+      if (el) sumFood += (parseFloat(el.value) || 0);
+    }
+
+    // Auto-fill order total from individual amounts if top field is empty/untouched
+    if (orderTotal === 0 && sumFood > 0 && !bulkTotalEl.dataset.manual) {
+      orderTotal = sumFood;
+      bulkTotalEl.value = sumFood.toFixed(2);
+    }
 
     // Update bill total display
     var billTotal = orderTotal + tax + tips;
@@ -872,7 +899,6 @@
 
     // Calculate each person's columns
     var sumIndividual = 0;
-    var sumFood = 0;
     for (var j = 0; j < orderMembers.length; j++) {
       var costEl = document.getElementById("order-cost-" + j);
       var taxEl = document.getElementById("order-tax-" + j);
@@ -881,7 +907,6 @@
       if (!costEl) continue;
 
       var food = parseFloat(costEl.value) || 0;
-      sumFood += food;
       var personTax = Math.round((food * taxRate) * 100) / 100;
       var personTip = Math.round(tipPerPerson * 100) / 100;
       var personTotal = Math.round((food + personTax + personTip) * 100) / 100;
@@ -1081,6 +1106,7 @@
         document.getElementById("payer").value = "";
         document.getElementById("driver").value = "";
         document.getElementById("bulk-total").value = "";
+        document.getElementById("bulk-total").dataset.manual = "";
         document.getElementById("bulk-tax").value = "";
         document.getElementById("bulk-tips").value = "";
         document.getElementById("grand-total").textContent = "$0.00";
@@ -1101,6 +1127,22 @@
     });
   };
 
+  // Rate a restaurant — each member can rate, stored per lunch
+  window.rateLunch = function(key, stars) {
+    // Prompt for who is rating
+    var name = prompt("Who is rating? Enter your name:");
+    if (!name || !name.trim()) return;
+    name = name.trim();
+    // Save rating under lunches/key/ratings/name
+    var updates = {};
+    updates[name] = stars;
+    fbPatch("lunches/" + key + "/ratings", updates, function() {
+      loadAllData(function() {
+        renderHistory();
+      });
+    });
+  };
+
   // History
   var editingKey = null;
 
@@ -1111,7 +1153,7 @@
       return;
     }
     var html = '<table class="history-table"><thead><tr>' +
-      '<th>Date</th><th>Place</th><th>Payer</th><th>Driver</th><th>Orders</th><th>Total</th><th></th>' +
+      '<th>Date</th><th>Place</th><th>Payer</th><th>Driver</th><th>Orders</th><th>Total</th><th>Rating</th><th></th>' +
       '</tr></thead><tbody>';
     for (var i = 0; i < appData.lunches.length; i++) {
       var l = appData.lunches[i];
@@ -1119,7 +1161,7 @@
 
       // If this row is being edited, show edit form
       if (editingKey && editingKey === key) {
-        html += '<tr class="edit-row"><td colspan="7">';
+        html += '<tr class="edit-row"><td colspan="8">';
         html += '<div class="edit-form-grid">';
         html += '<div><label>Date</label><input type="date" id="edit-date" value="' + esc(l.date || "") + '"></div>';
         html += '<div><label>Place</label><input type="text" id="edit-place" value="' + esc(l.place || "") + '"></div>';
@@ -1170,6 +1212,25 @@
       if (payerVenmo) {
         venmoPayLink = '<a class="venmo-link" href="https://venmo.com/' + esc(payerVenmo.replace("@", "")) + '" target="_blank">Pay</a>';
       }
+      // Build star rating for this lunch
+      var ratings = l.ratings || {};
+      var ratingKeys = Object.keys(ratings);
+      var avgRating = 0;
+      if (ratingKeys.length > 0) {
+        var ratingSum = 0;
+        for (var rk = 0; rk < ratingKeys.length; rk++) ratingSum += ratings[ratingKeys[rk]];
+        avgRating = ratingSum / ratingKeys.length;
+      }
+      var starsHtml = '<div class="star-rating">';
+      for (var st = 1; st <= 5; st++) {
+        var filled = avgRating >= st ? " filled" : (avgRating >= st - 0.5 ? " filled" : "");
+        starsHtml += '<button class="star' + filled + '" onclick="rateLunch(\'' + key + '\',' + st + ')">' + (st <= Math.round(avgRating) ? "&#9733;" : "&#9734;") + '</button>';
+      }
+      starsHtml += '</div>';
+      if (ratingKeys.length > 0) {
+        starsHtml += '<span class="avg-rating">' + avgRating.toFixed(1) + ' (' + ratingKeys.length + ')</span>';
+      }
+
       html += '<tr>' +
         '<td>' + esc(l.date) + '</td>' +
         '<td>' + esc(l.place || "-") + '</td>' +
@@ -1177,6 +1238,7 @@
         '<td><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
         '<td style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
         '<td><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
+        '<td>' + starsHtml + '</td>' +
         '<td>' +
           '<button class="edit-btn" onclick="editLunch(\'' + key + '\')" title="Edit">Edit</button> ' +
           '<button class="delete-btn" onclick="deleteLunchByKey(\'' + key + '\')" title="Delete">X</button>' +
