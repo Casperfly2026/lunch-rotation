@@ -419,9 +419,7 @@
           <div class="result" id="dice-driver">?</div>
         </div>
       </div>
-      <div id="dice-status" style="font-size:0.85rem;color:var(--success);font-weight:600;margin-bottom:8px;display:none">Locked for today</div>
       <button class="dice-btn" id="btn-roll">🎲 Roll the Dice!</button>
-      <button class="btn btn-sm" id="btn-reroll-locked" style="display:none;background:var(--gray-200);color:var(--gray-700);margin-top:8px">🎲 Re-roll</button>
     </div>
     <div class="card">
       <h2>Log a Lunch</h2>
@@ -1315,42 +1313,20 @@
   // Dice roller — persists per day in Firebase
   var rolledPayer = "";
   var rolledDriver = "";
-  var diceLockedToday = false;
 
-  // Load today's roll from Firebase
-  function loadDailyRoll() {
-    var today = getLocalDateStr();
+  // Load saved roll from Firebase
+  function loadSavedRoll() {
     fbGet("dailyRoll", function(err, data) {
-      if (!err && data && data.date === today) {
-        // Today's roll exists — show locked result
+      if (!err && data && data.payer) {
         rolledPayer = data.payer;
         rolledDriver = data.driver;
-        diceLockedToday = true;
-        showLockedDice();
-      } else {
-        // No roll for today — show roll button
-        diceLockedToday = false;
-        document.getElementById("dice-payer").textContent = "?";
-        document.getElementById("dice-driver").textContent = "?";
-        document.getElementById("btn-roll").style.display = "";
-        document.getElementById("dice-accept").classList.remove("show");
-        document.getElementById("dice-status").style.display = "none";
-        document.getElementById("btn-reroll-locked").style.display = "none";
+        document.getElementById("dice-payer").textContent = rolledPayer;
+        document.getElementById("dice-driver").textContent = rolledDriver;
+        document.getElementById("btn-roll").textContent = "🎲 Re-roll";
+        document.getElementById("payer").value = rolledPayer;
+        document.getElementById("driver").value = rolledDriver;
       }
     });
-  }
-
-  function showLockedDice() {
-    document.getElementById("dice-payer").textContent = rolledPayer;
-    document.getElementById("dice-driver").textContent = rolledDriver;
-    document.getElementById("btn-roll").style.display = "none";
-    document.getElementById("dice-accept").classList.remove("show");
-    document.getElementById("dice-status").style.display = "block";
-    document.getElementById("btn-reroll-locked").style.display = "";
-
-    // Auto-set payer/driver dropdowns
-    document.getElementById("payer").value = rolledPayer;
-    document.getElementById("driver").value = rolledDriver;
   }
 
   function rollDice() {
@@ -1379,7 +1355,6 @@
       if (shuffleCount >= totalShuffles) {
         clearInterval(shuffleInterval);
 
-        // Pick final results — make sure payer and driver are different if possible
         var members = appData.members.slice();
         var payerIdx = Math.floor(Math.random() * members.length);
         rolledPayer = members[payerIdx];
@@ -1397,13 +1372,12 @@
         payerEl.classList.remove("spinning");
         driverEl.classList.remove("spinning");
         diceBtn.classList.remove("rolling");
+        diceBtn.textContent = "🎲 Re-roll";
 
-        // Save to Firebase immediately so everyone sees the result
-        var today = getLocalDateStr();
-        var rollData = { date: today, payer: rolledPayer, driver: rolledDriver };
-        fbPut("dailyRoll", rollData, function() {
-          diceLockedToday = true;
-          showLockedDice();
+        // Save to Firebase so everyone sees the result
+        fbPut("dailyRoll", { payer: rolledPayer, driver: rolledDriver }, function() {
+          document.getElementById("payer").value = rolledPayer;
+          document.getElementById("driver").value = rolledDriver;
         });
       }
     }, 80);
@@ -1434,17 +1408,9 @@
   document.getElementById("btn-roll").addEventListener("click", function() {
     rollDice();
   });
-  document.getElementById("btn-reroll-locked").addEventListener("click", function() {
-    diceLockedToday = false;
-    document.getElementById("btn-roll").style.display = "";
-    document.getElementById("dice-status").style.display = "none";
-    document.getElementById("btn-reroll-locked").style.display = "none";
-    rollDice();
-  });
-
-  // Load data, daily roll, and auto-refresh every 15 seconds
+  // Load data and saved roll, auto-refresh every 15 seconds
   loadAllData(function() {
-    loadDailyRoll();
+    loadSavedRoll();
   });
   pollInterval = setInterval(loadAllData, 15000);
 
