@@ -1329,6 +1329,42 @@
     });
   }
 
+  // Pick from members who have done the least, with randomness among ties
+  function pickWeighted(members, countMap) {
+    if (members.length === 0) return members[0];
+    // Find the minimum count
+    var minCount = Infinity;
+    var i;
+    for (i = 0; i < members.length; i++) {
+      var c = countMap[members[i]] || 0;
+      if (c < minCount) minCount = c;
+    }
+    // Collect all members with that minimum count
+    var candidates = [];
+    for (i = 0; i < members.length; i++) {
+      if ((countMap[members[i]] || 0) === minCount) candidates.push(members[i]);
+    }
+    // Pick randomly among the candidates
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
+
+  // Build pay/drive counts from history
+  function getDiceCounts() {
+    var payCount = {};
+    var driveCount = {};
+    var i;
+    for (i = 0; i < appData.members.length; i++) {
+      payCount[appData.members[i]] = 0;
+      driveCount[appData.members[i]] = 0;
+    }
+    for (i = 0; i < appData.lunches.length; i++) {
+      var l = appData.lunches[i];
+      if (payCount[l.payer] !== undefined) payCount[l.payer]++;
+      if (driveCount[l.driver] !== undefined) driveCount[l.driver]++;
+    }
+    return { pay: payCount, drive: driveCount };
+  }
+
   function rollDice() {
     if (appData.members.length < 2) {
       alert("Need at least 2 members to roll!");
@@ -1355,14 +1391,19 @@
       if (shuffleCount >= totalShuffles) {
         clearInterval(shuffleInterval);
 
+        // Use history to pick fairly — prioritize those who have done the least
+        var counts = getDiceCounts();
         var members = appData.members.slice();
-        var payerIdx = Math.floor(Math.random() * members.length);
-        rolledPayer = members[payerIdx];
 
-        if (members.length > 1) {
-          var driverPool = members.slice();
-          driverPool.splice(payerIdx, 1);
-          rolledDriver = driverPool[Math.floor(Math.random() * driverPool.length)];
+        rolledPayer = pickWeighted(members, counts.pay);
+
+        // For driver, pick from remaining members (exclude payer)
+        var driverPool = [];
+        for (var dp = 0; dp < members.length; dp++) {
+          if (members[dp] !== rolledPayer) driverPool.push(members[dp]);
+        }
+        if (driverPool.length > 0) {
+          rolledDriver = pickWeighted(driverPool, counts.drive);
         } else {
           rolledDriver = rolledPayer;
         }
