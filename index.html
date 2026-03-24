@@ -483,6 +483,7 @@
             <select id="add-orderer"><option value="">Select member...</option></select>
           </div>
           <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
+          <button class="btn btn-primary btn-sm" id="btn-split">Split Evenly</button>
         </div>
         <div id="orders-list"></div>
       </div>
@@ -927,6 +928,25 @@
     } else {
       msgEl.style.display = "none";
     }
+  };
+
+  // Split order total evenly across all added people
+  window.splitEvenly = function() {
+    var orderTotal = parseFloat(document.getElementById("bulk-total").value) || 0;
+    if (orderTotal <= 0) {
+      alert("Please enter the Order Total first.");
+      return;
+    }
+    if (orderMembers.length === 0) {
+      alert("Add people to the order first.");
+      return;
+    }
+    var perPerson = Math.round((orderTotal / orderMembers.length) * 100) / 100;
+    for (var i = 0; i < orderMembers.length; i++) {
+      var el = document.getElementById("order-cost-" + i);
+      if (el) el.value = perPerson.toFixed(2);
+    }
+    window.recalcAll();
   };
 
   function renderOrders() {
@@ -1377,6 +1397,9 @@
   });
   document.getElementById("btn-add-all").addEventListener("click", function() {
     window.addAllOrderers();
+  });
+  document.getElementById("btn-split").addEventListener("click", function() {
+    window.splitEvenly();
   });
   document.getElementById("btn-save").addEventListener("click", function() {
     saveLunch();
