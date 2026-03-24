@@ -881,8 +881,8 @@
       if (el) sumFood += (parseFloat(el.value) || 0);
     }
 
-    // Auto-fill order total from individual amounts if top field is empty/untouched
-    if (orderTotal === 0 && sumFood > 0 && !bulkTotalEl.dataset.manual) {
+    // Auto-fill order total from individual amounts if payer hasn't manually typed it
+    if (!bulkTotalEl.dataset.manual && sumFood > 0) {
       orderTotal = sumFood;
       bulkTotalEl.value = sumFood.toFixed(2);
     }
