@@ -224,6 +224,38 @@
     vertical-align: top;
   }
   .history-table tr:hover td { background: var(--gray-50); }
+  @media (max-width: 640px) {
+    .history-table, .history-table thead, .history-table tbody, .history-table th, .history-table td, .history-table tr {
+      display: block;
+    }
+    .history-table thead { display: none; }
+    .history-table tr {
+      margin-bottom: 12px;
+      border: 1px solid var(--gray-200);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #fff;
+    }
+    .history-table tr:hover td { background: transparent; }
+    .history-table td {
+      padding: 4px 0;
+      border-bottom: none;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .history-table td:before {
+      content: attr(data-label);
+      font-weight: 600;
+      font-size: 0.75rem;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      min-width: 70px;
+    }
+    .edit-row td { flex-direction: column; align-items: stretch; }
+    .edit-row td:before { display: none; }
+  }
   .badge {
     display: inline-block;
     padding: 2px 8px;
@@ -312,8 +344,8 @@
     color: var(--gray-400);
   }
   .dice-card {
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    border: 2px solid #e94560;
+    background: linear-gradient(135deg, var(--primary), #7c3aed);
+    border: none;
     border-radius: var(--radius);
     padding: 24px 20px;
     margin-bottom: 20px;
@@ -1316,14 +1348,14 @@
       }
 
       html += '<tr>' +
-        '<td>' + esc(l.date) + '</td>' +
-        '<td>' + esc(l.place || "-") + '</td>' +
-        '<td><span class="badge badge-pay">' + esc(l.payer) + '</span>' + venmoPayLink + '</td>' +
-        '<td><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
-        '<td style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
-        '<td><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
-        '<td>' + starsHtml + '</td>' +
-        '<td>' +
+        '<td data-label="Date">' + esc(l.date) + '</td>' +
+        '<td data-label="Place">' + esc(l.place || "-") + '</td>' +
+        '<td data-label="Payer"><span class="badge badge-pay">' + esc(l.payer) + '</span>' + venmoPayLink + '</td>' +
+        '<td data-label="Driver"><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
+        '<td data-label="Orders" style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
+        '<td data-label="Total"><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
+        '<td data-label="Rating">' + starsHtml + '</td>' +
+        '<td data-label="">' +
           '<button class="edit-btn" onclick="editLunch(\'' + key + '\')" title="Edit">Edit</button> ' +
           '<button class="delete-btn" onclick="deleteLunchByKey(\'' + key + '\')" title="Delete">X</button>' +
         '</td>' +
