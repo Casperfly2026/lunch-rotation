@@ -251,23 +251,23 @@
   .stat-card .stat-item strong { color: var(--gray-800); }
   .order-remove-btn {
     cursor: pointer;
-    color: #fff;
-    background: var(--danger);
-    border: none;
-    font-size: 1rem;
-    font-weight: 700;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
+    color: var(--danger);
+    background: var(--danger-bg);
+    border: 1.5px solid var(--danger);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     line-height: 1;
-    transition: background 0.15s, transform 0.15s;
+    transition: all 0.15s;
   }
   .order-remove-btn:hover {
-    background: #c0392b;
-    transform: scale(1.1);
+    background: var(--danger);
+    color: #fff;
+    transform: scale(1.05);
   }
   .member-chip {
     display: inline-flex;
@@ -522,6 +522,7 @@
           <div id="member-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;margin-bottom:8px"></div>
           <div style="display:flex;gap:8px;margin-top:8px">
             <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
+            <button class="btn btn-sm" id="btn-remove-all" style="background:var(--danger-bg);color:var(--danger)">Remove All</button>
             <button class="btn btn-primary btn-sm" id="btn-split">Split Evenly</button>
           </div>
         </div>
@@ -908,6 +909,12 @@
 
   window.removeOrderer = function(idx) {
     orderMembers.splice(idx, 1);
+    populateOrdererDropdown();
+    renderOrders();
+  };
+
+  window.removeAllOrderers = function() {
+    orderMembers = [];
     populateOrdererDropdown();
     renderOrders();
   };
@@ -1569,6 +1576,9 @@
   });
   document.getElementById("btn-add-all").addEventListener("click", function() {
     window.addAllOrderers();
+  });
+  document.getElementById("btn-remove-all").addEventListener("click", function() {
+    window.removeAllOrderers();
   });
   document.getElementById("btn-split").addEventListener("click", function() {
     window.splitEvenly();
