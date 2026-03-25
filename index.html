@@ -312,68 +312,96 @@
     color: var(--gray-400);
   }
   .dice-card {
-    background: linear-gradient(135deg, #fef3c7, #fde68a);
-    border: 2px solid #f59e0b;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border: 2px solid #e94560;
     border-radius: var(--radius);
-    padding: 20px;
+    padding: 24px 20px;
     margin-bottom: 20px;
     text-align: center;
   }
   .dice-card h2 {
     justify-content: center;
-    margin-bottom: 12px;
-    color: var(--gray-800);
+    margin-bottom: 16px;
+    color: #fff;
   }
   .dice-container {
     display: flex;
     justify-content: center;
-    gap: 40px;
-    margin: 16px 0;
+    gap: 32px;
+    margin: 20px 0;
     flex-wrap: wrap;
   }
   .dice-slot {
     text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
-  .dice-slot .label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--gray-600);
+  .dice-3d {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(145deg, #ef4444 0%, #dc2626 40%, #b91c1c 100%);
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 6px 6px 0px #991b1b, 8px 8px 20px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.25);
+    position: relative;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .dice-3d .dice-icon {
+    font-size: 2rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+  }
+  .dice-3d .dice-icon-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+  }
+  .dice-3d.spinning {
+    animation: diceShake 0.12s ease-in-out infinite;
+  }
+  @keyframes diceShake {
+    0% { transform: rotate(-8deg) scale(1.05); }
+    50% { transform: rotate(8deg) scale(0.95); }
+    100% { transform: rotate(-8deg) scale(1.05); }
   }
   .dice-slot .result {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     font-weight: 700;
-    color: var(--gray-800);
-    min-height: 42px;
+    color: #fff;
+    min-height: 36px;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-top: 10px;
   }
-  .dice-slot .result.spinning {
-    animation: slotSpin 0.1s linear infinite;
-  }
-  @keyframes slotSpin {
-    0% { opacity: 1; }
-    50% { opacity: 0.4; }
-    100% { opacity: 1; }
+  .dice-slot .result.has-name {
+    background: rgba(255,255,255,0.12);
+    padding: 4px 16px;
+    border-radius: 20px;
   }
   .dice-btn {
     background: linear-gradient(135deg, #ef4444, #dc2626);
     color: white;
-    border: none;
-    padding: 12px 32px;
+    border: 3px solid rgba(255,255,255,0.2);
+    padding: 14px 36px;
     border-radius: 50px;
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-weight: 700;
     cursor: pointer;
     transition: transform 0.2s, box-shadow 0.2s;
-    box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+    box-shadow: 0 4px 16px rgba(239,68,68,0.4);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
   }
   .dice-btn:hover {
     transform: scale(1.05);
-    box-shadow: 0 6px 16px rgba(239,68,68,0.4);
+    box-shadow: 0 6px 20px rgba(239,68,68,0.5);
   }
   .dice-btn:active { transform: scale(0.95); }
   .dice-btn.rolling {
@@ -462,15 +490,21 @@
       <h2>🎲 Who's paying &amp; driving today?</h2>
       <div class="dice-container">
         <div class="dice-slot">
-          <div class="label">💳 Payer</div>
+          <div class="dice-3d" id="dice-pay-cube">
+            <span class="dice-icon">💳</span>
+            <span class="dice-icon-label">Payer</span>
+          </div>
           <div class="result" id="dice-payer">?</div>
         </div>
         <div class="dice-slot">
-          <div class="label">🚗 Driver</div>
+          <div class="dice-3d" id="dice-drive-cube">
+            <span class="dice-icon">🚗</span>
+            <span class="dice-icon-label">Driver</span>
+          </div>
           <div class="result" id="dice-driver">?</div>
         </div>
       </div>
-      <button class="dice-btn" id="btn-roll">🎲 Roll the Dice!</button>
+      <button class="dice-btn" id="btn-roll">ROLL THE DICE</button>
     </div>
     <div class="card">
       <h2>Log a Lunch</h2>
@@ -1461,8 +1495,10 @@
         rolledPayer = data.payer;
         rolledDriver = data.driver;
         document.getElementById("dice-payer").textContent = rolledPayer;
+        document.getElementById("dice-payer").classList.add("has-name");
         document.getElementById("dice-driver").textContent = rolledDriver;
-        document.getElementById("btn-roll").textContent = "🎲 Re-roll";
+        document.getElementById("dice-driver").classList.add("has-name");
+        document.getElementById("btn-roll").textContent = "RE-ROLL";
         document.getElementById("payer").value = rolledPayer;
         document.getElementById("driver").value = rolledDriver;
       }
@@ -1514,10 +1550,14 @@
     var diceBtn = document.getElementById("btn-roll");
     var payerEl = document.getElementById("dice-payer");
     var driverEl = document.getElementById("dice-driver");
+    var payCube = document.getElementById("dice-pay-cube");
+    var driveCube = document.getElementById("dice-drive-cube");
 
     diceBtn.classList.add("rolling");
-    payerEl.classList.add("spinning");
-    driverEl.classList.add("spinning");
+    payCube.classList.add("spinning");
+    driveCube.classList.add("spinning");
+    payerEl.classList.remove("has-name");
+    driverEl.classList.remove("has-name");
 
     var shuffleCount = 0;
     var totalShuffles = 20;
@@ -1550,10 +1590,12 @@
 
         payerEl.textContent = rolledPayer;
         driverEl.textContent = rolledDriver;
-        payerEl.classList.remove("spinning");
-        driverEl.classList.remove("spinning");
+        payerEl.classList.add("has-name");
+        driverEl.classList.add("has-name");
+        payCube.classList.remove("spinning");
+        driveCube.classList.remove("spinning");
         diceBtn.classList.remove("rolling");
-        diceBtn.textContent = "🎲 Re-roll";
+        diceBtn.textContent = "RE-ROLL";
 
         // Save to Firebase so everyone sees the result
         fbPut("dailyRoll", { payer: rolledPayer, driver: rolledDriver }, function() {
