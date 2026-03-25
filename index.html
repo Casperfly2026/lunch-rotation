@@ -1224,9 +1224,7 @@
         for (var j = 0; j < l.orders.length; j++) {
           var ord = l.orders[j];
           var line = esc(ord.name);
-          if (ord.food && ord.cost && ord.food !== ord.cost) {
-            line += " ($" + ord.food.toFixed(2) + " + tax/tip = $" + ord.cost.toFixed(2) + ")";
-          } else if (ord.cost) {
+          if (ord.cost) {
             line += " ($" + ord.cost.toFixed(2) + ")";
           }
           orderParts.push(line);
