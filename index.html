@@ -249,6 +249,26 @@
   }
   .stat-card .stat-item { font-size: 0.82rem; color: var(--gray-600); }
   .stat-card .stat-item strong { color: var(--gray-800); }
+  .order-remove-btn {
+    cursor: pointer;
+    color: #fff;
+    background: var(--danger);
+    border: none;
+    font-size: 1rem;
+    font-weight: 700;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .order-remove-btn:hover {
+    background: #c0392b;
+    transform: scale(1.1);
+  }
   .member-chip {
     display: inline-flex;
     align-items: center;
@@ -1004,7 +1024,7 @@
         '<span id="order-tax-' + i + '" style="font-size:0.85rem;color:var(--gray-500);text-align:center">-</span>' +
         '<span id="order-tip-' + i + '" style="font-size:0.85rem;color:var(--gray-500);text-align:center">-</span>' +
         '<span id="order-total-' + i + '" style="font-size:0.9rem;font-weight:700;color:var(--primary);text-align:center">-</span>' +
-        '<button class="remove-btn" onclick="removeOrderer(' + i + ')" title="Remove" style="font-size:0.85rem;padding:2px 6px">&times;</button>' +
+        '<button class="order-remove-btn" onclick="removeOrderer(' + i + ')" title="Remove">&times;</button>' +
         '</div>';
     }
     container.innerHTML = html;
