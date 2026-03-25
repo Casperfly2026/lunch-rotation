@@ -1509,8 +1509,8 @@
     for (i = 0; i < appData.members.length; i++) {
       m = appData.members[i];
       var st = stats[m];
-      html += '<tr><td><strong>' + esc(m) + '</strong></td><td>' + st.paid + '</td><td>' + st.drove + '</td><td>' + st.ordered +
-        '</td><td>$' + st.spent.toFixed(2) + '</td><td>$' + st.paidTotal.toFixed(2) + '</td></tr>';
+      html += '<tr><td data-label="Member"><strong>' + esc(m) + '</strong></td><td data-label="Times Paid">' + st.paid + '</td><td data-label="Times Drove">' + st.drove + '</td><td data-label="Times Ordered">' + st.ordered +
+        '</td><td data-label="Spending">$' + st.spent.toFixed(2) + '</td><td data-label="Covered">$' + st.paidTotal.toFixed(2) + '</td></tr>';
     }
     html += '</tbody></table></div>';
     container.innerHTML = html;
