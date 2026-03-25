@@ -249,6 +249,24 @@
   }
   .stat-card .stat-item { font-size: 0.82rem; color: var(--gray-600); }
   .stat-card .stat-item strong { color: var(--gray-800); }
+  .member-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1.5px solid var(--primary);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .member-chip:hover {
+    background: var(--primary);
+    color: #fff;
+    transform: scale(1.05);
+  }
   .fairness-bar {
     height: 6px;
     border-radius: 3px;
@@ -479,13 +497,13 @@
       </div>
       <div style="margin-bottom:12px">
         <div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;color:var(--gray-700)">Step 2: Add people &amp; enter each person's food amount</div>
-        <div style="display:flex;gap:8px;align-items:end;margin-bottom:12px">
-          <div style="flex:1">
-            <label>Add person (select to add)</label>
-            <select id="add-orderer"><option value="">Select member...</option></select>
+        <div style="margin-bottom:12px">
+          <label>Tap to add people</label>
+          <div id="member-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
+            <button class="btn btn-primary btn-sm" id="btn-split">Split Evenly</button>
           </div>
-          <button class="btn btn-sm" id="btn-add-all" style="background:var(--gray-200);color:var(--gray-700)">Add All</button>
-          <button class="btn btn-primary btn-sm" id="btn-split">Split Evenly</button>
         </div>
         <div id="orders-list"></div>
       </div>
@@ -825,32 +843,39 @@
   }
 
   function populateOrdererDropdown() {
-    var sel = document.getElementById("add-orderer");
-    sel.innerHTML = '<option value="">Select member...</option>';
+    var container = document.getElementById("member-chips");
+    container.innerHTML = "";
     for (var i = 0; i < appData.members.length; i++) {
-      // Only show members not already in today's order
       var alreadyIn = false;
       for (var j = 0; j < orderMembers.length; j++) {
         if (orderMembers[j] === appData.members[i]) { alreadyIn = true; break; }
       }
       if (!alreadyIn) {
-        var opt = document.createElement("option");
-        opt.value = appData.members[i];
-        opt.textContent = appData.members[i];
-        sel.appendChild(opt);
+        var chip = document.createElement("button");
+        chip.className = "member-chip";
+        chip.textContent = "+ " + appData.members[i];
+        chip.setAttribute("data-name", appData.members[i]);
+        chip.onclick = (function(name) {
+          return function() {
+            orderMembers.push(name);
+            populateOrdererDropdown();
+            renderOrders();
+          };
+        })(appData.members[i]);
+        container.appendChild(chip);
       }
+    }
+    if (container.innerHTML === "" && appData.members.length > 0) {
+      container.innerHTML = '<span style="font-size:0.8rem;color:var(--gray-400)">All members added</span>';
     }
   }
 
   // Track who is in today's order (not everyone by default)
   var orderMembers = [];
 
-  window.addOrderer = function() {
-    var sel = document.getElementById("add-orderer");
-    var name = sel.value;
+  window.addOrderer = function(name) {
     if (!name) return;
     orderMembers.push(name);
-    sel.value = "";
     populateOrdererDropdown();
     renderOrders();
   };
@@ -1324,22 +1349,50 @@
       }
     }
 
-    var maxPay = 1;
-    var maxDrive = 1;
+    var maxPay = 0;
+    var maxDrive = 0;
     for (i = 0; i < appData.members.length; i++) {
       m = appData.members[i];
       if (stats[m].paid > maxPay) maxPay = stats[m].paid;
       if (stats[m].drove > maxDrive) maxDrive = stats[m].drove;
     }
+    // Ensure at least 1 so we don't divide by zero
+    if (maxPay === 0) maxPay = 1;
+    if (maxDrive === 0) maxDrive = 1;
+
+    // Calculate ideal (equal share) for fairness comparison
+    var totalPays = 0;
+    var totalDrives = 0;
+    for (i = 0; i < appData.members.length; i++) {
+      totalPays += stats[appData.members[i]].paid;
+      totalDrives += stats[appData.members[i]].drove;
+    }
+    var idealPay = appData.members.length > 0 ? totalPays / appData.members.length : 0;
+    var idealDrive = appData.members.length > 0 ? totalDrives / appData.members.length : 0;
 
     var html = '<div class="stats-grid">';
     for (i = 0; i < appData.members.length; i++) {
       m = appData.members[i];
       var s = stats[m];
+      // Use percentage of max, but give 0 a visible minimum bar
       var payPct = (s.paid / maxPay) * 100;
       var drivePct = (s.drove / maxDrive) * 100;
-      var payColor = payPct >= 80 ? "var(--success)" : payPct >= 40 ? "var(--warning)" : "var(--danger)";
-      var driveColor = drivePct >= 80 ? "var(--success)" : drivePct >= 40 ? "var(--warning)" : "var(--danger)";
+      // Color: green if at or above fair share, yellow if close, red if behind
+      var payColor, driveColor;
+      if (s.paid === 0) {
+        payColor = "var(--danger)";
+        payPct = 8; // minimum visible width
+      } else {
+        payColor = payPct >= 80 ? "var(--success)" : payPct >= 40 ? "var(--warning)" : "var(--danger)";
+      }
+      if (s.drove === 0) {
+        driveColor = "var(--danger)";
+        drivePct = 8; // minimum visible width
+      } else {
+        driveColor = drivePct >= 80 ? "var(--success)" : drivePct >= 40 ? "var(--warning)" : "var(--danger)";
+      }
+      var payLabel = s.paid === 0 ? " (none yet)" : "";
+      var driveLabel = s.drove === 0 ? " (none yet)" : "";
       html +=
         '<div class="stat-card">' +
           '<div class="name">' + esc(m) + '</div>' +
@@ -1352,9 +1405,9 @@
             '<div class="stat-item">Spent: <strong>$' + s.spent.toFixed(2) + '</strong></div>' +
           '</div>' +
           '<div style="font-size:0.78rem;color:var(--gray-500);margin-top:4px">Covered: $' + s.paidTotal.toFixed(2) + ' total for group</div>' +
-          '<div style="margin-top:8px;font-size:0.75rem;color:var(--gray-500)">Pay fairness</div>' +
+          '<div style="margin-top:8px;font-size:0.75rem;color:var(--gray-500)">Pay fairness' + payLabel + '</div>' +
           '<div class="fairness-bar"><div class="fill" style="width:' + payPct + '%;background:' + payColor + '"></div></div>' +
-          '<div style="margin-top:6px;font-size:0.75rem;color:var(--gray-500)">Drive fairness</div>' +
+          '<div style="margin-top:6px;font-size:0.75rem;color:var(--gray-500)">Drive fairness' + driveLabel + '</div>' +
           '<div class="fairness-bar"><div class="fill" style="width:' + drivePct + '%;background:' + driveColor + '"></div></div>' +
         '</div>';
     }
@@ -1495,9 +1548,6 @@
   });
   document.getElementById("new-member").addEventListener("keydown", function(e) {
     if (e.key === "Enter") addMember();
-  });
-  document.getElementById("add-orderer").addEventListener("change", function() {
-    window.addOrderer();
   });
   document.getElementById("btn-add-all").addEventListener("click", function() {
     window.addAllOrderers();
