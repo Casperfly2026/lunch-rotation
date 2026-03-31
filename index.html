@@ -519,7 +519,7 @@
 
   <div id="tab-new">
     <div class="dice-card">
-      <h2>🎲 Who's paying &amp; driving today?</h2>
+      <h2>🎲 Who's paying, driving &amp; where?</h2>
       <div class="dice-container">
         <div class="dice-slot">
           <div class="dice-3d" id="dice-pay-cube">
@@ -534,6 +534,13 @@
             <span class="dice-icon-label">Driver</span>
           </div>
           <div class="result" id="dice-driver">?</div>
+        </div>
+        <div class="dice-slot">
+          <div class="dice-3d" id="dice-resto-cube" style="background:linear-gradient(145deg, #f59e0b 0%, #d97706 40%, #b45309 100%);box-shadow:6px 6px 0px #92400e, 8px 8px 20px rgba(0,0,0,0.4), inset 0 2px 4px rgba(255,255,255,0.25)">
+            <span class="dice-icon">🍽️</span>
+            <span class="dice-icon-label">Restaurant</span>
+          </div>
+          <div class="result" id="dice-resto">?</div>
         </div>
       </div>
       <button class="dice-btn" id="btn-roll">ROLL THE DICE</button>
@@ -1519,6 +1526,23 @@
   // Dice roller — persists per day in Firebase
   var rolledPayer = "";
   var rolledDriver = "";
+  var rolledResto = "";
+
+  // Members excluded from paying/driving
+  var diceExcluded = ["Vickie", "Minyu"];
+
+  // Restaurants within ~10 min drive of 1840 Gateway Dr, San Mateo
+  var nearbyRestaurants = [
+    "Lazy Dog", "BJ's Brewhouse", "Chick-fil-A", "Armadillo Willy's",
+    "Benihana", "California Fish Grill", "Starbird", "Panera Bread",
+    "Chipotle", "In-N-Out Burger", "Panda Express",
+    "Santa Ramen", "Ramen Dojo", "Jack's Restaurant",
+    "Palette Tea Garden", "Paul Martin's", "Pacific Catch",
+    "Reposado", "Flores", "All Spice",
+    "Colander Kitchens", "Central Park Bistro",
+    "Gao Viet Kitchen", "Amazing Katsu", "Kajiken",
+    "Prime BBQ", "808 Zone", "Five Guys"
+  ];
 
   // Load saved roll from Firebase
   function loadSavedRoll() {
@@ -1526,10 +1550,15 @@
       if (!err && data && data.payer) {
         rolledPayer = data.payer;
         rolledDriver = data.driver;
+        rolledResto = data.restaurant || "";
         document.getElementById("dice-payer").textContent = rolledPayer;
         document.getElementById("dice-payer").classList.add("has-name");
         document.getElementById("dice-driver").textContent = rolledDriver;
         document.getElementById("dice-driver").classList.add("has-name");
+        if (rolledResto) {
+          document.getElementById("dice-resto").textContent = rolledResto;
+          document.getElementById("dice-resto").classList.add("has-name");
+        }
         document.getElementById("btn-roll").textContent = "RE-ROLL";
         document.getElementById("payer").value = rolledPayer;
         document.getElementById("driver").value = rolledDriver;
@@ -1574,30 +1603,46 @@
   }
 
   function rollDice() {
-    if (appData.members.length < 2) {
-      alert("Need at least 2 members to roll!");
+    // Filter out excluded members for pay/drive
+    var eligible = [];
+    var i;
+    for (i = 0; i < appData.members.length; i++) {
+      var excluded = false;
+      for (var e = 0; e < diceExcluded.length; e++) {
+        if (appData.members[i].toLowerCase() === diceExcluded[e].toLowerCase()) { excluded = true; break; }
+      }
+      if (!excluded) eligible.push(appData.members[i]);
+    }
+    if (eligible.length < 2) {
+      alert("Need at least 2 eligible members to roll!");
       return;
     }
 
     var diceBtn = document.getElementById("btn-roll");
     var payerEl = document.getElementById("dice-payer");
     var driverEl = document.getElementById("dice-driver");
+    var restoEl = document.getElementById("dice-resto");
     var payCube = document.getElementById("dice-pay-cube");
     var driveCube = document.getElementById("dice-drive-cube");
+    var restoCube = document.getElementById("dice-resto-cube");
 
     diceBtn.classList.add("rolling");
     payCube.classList.add("spinning");
     driveCube.classList.add("spinning");
+    restoCube.classList.add("spinning");
     payerEl.classList.remove("has-name");
     driverEl.classList.remove("has-name");
+    restoEl.classList.remove("has-name");
 
     var shuffleCount = 0;
     var totalShuffles = 20;
     var shuffleInterval = setInterval(function() {
-      var randPayer = appData.members[Math.floor(Math.random() * appData.members.length)];
-      var randDriver = appData.members[Math.floor(Math.random() * appData.members.length)];
+      var randPayer = eligible[Math.floor(Math.random() * eligible.length)];
+      var randDriver = eligible[Math.floor(Math.random() * eligible.length)];
+      var randResto = nearbyRestaurants[Math.floor(Math.random() * nearbyRestaurants.length)];
       payerEl.textContent = randPayer;
       driverEl.textContent = randDriver;
+      restoEl.textContent = randResto;
       shuffleCount++;
 
       if (shuffleCount >= totalShuffles) {
@@ -1605,14 +1650,13 @@
 
         // Use history to pick fairly — prioritize those who have done the least
         var counts = getDiceCounts();
-        var members = appData.members.slice();
 
-        rolledPayer = pickWeighted(members, counts.pay);
+        rolledPayer = pickWeighted(eligible, counts.pay);
 
-        // For driver, pick from remaining members (exclude payer)
+        // For driver, pick from remaining eligible (exclude payer)
         var driverPool = [];
-        for (var dp = 0; dp < members.length; dp++) {
-          if (members[dp] !== rolledPayer) driverPool.push(members[dp]);
+        for (var dp = 0; dp < eligible.length; dp++) {
+          if (eligible[dp] !== rolledPayer) driverPool.push(eligible[dp]);
         }
         if (driverPool.length > 0) {
           rolledDriver = pickWeighted(driverPool, counts.drive);
@@ -1620,17 +1664,23 @@
           rolledDriver = rolledPayer;
         }
 
+        // Pick random restaurant
+        rolledResto = nearbyRestaurants[Math.floor(Math.random() * nearbyRestaurants.length)];
+
         payerEl.textContent = rolledPayer;
         driverEl.textContent = rolledDriver;
+        restoEl.textContent = rolledResto;
         payerEl.classList.add("has-name");
         driverEl.classList.add("has-name");
+        restoEl.classList.add("has-name");
         payCube.classList.remove("spinning");
         driveCube.classList.remove("spinning");
+        restoCube.classList.remove("spinning");
         diceBtn.classList.remove("rolling");
         diceBtn.textContent = "RE-ROLL";
 
         // Save to Firebase so everyone sees the result
-        fbPut("dailyRoll", { payer: rolledPayer, driver: rolledDriver }, function() {
+        fbPut("dailyRoll", { payer: rolledPayer, driver: rolledDriver, restaurant: rolledResto }, function() {
           document.getElementById("payer").value = rolledPayer;
           document.getElementById("driver").value = rolledDriver;
         });
