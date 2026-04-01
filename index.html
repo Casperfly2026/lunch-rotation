@@ -1323,11 +1323,26 @@
 
       var orderParts = [];
       if (l.orders) {
+        // Recalculate each person's true total using lunch-level tax & tips
+        var histSumFood = 0;
+        for (var hf = 0; hf < l.orders.length; hf++) {
+          histSumFood += (l.orders[hf].food || l.orders[hf].cost || 0);
+        }
+        var histTaxRate = (l.tax && histSumFood > 0) ? (l.tax / histSumFood) : 0;
+        var histTipPer = (l.tips && l.orders.length > 0) ? (l.tips / l.orders.length) : 0;
+
         for (var j = 0; j < l.orders.length; j++) {
           var ord = l.orders[j];
           var line = esc(ord.name);
-          if (ord.cost) {
-            line += " ($" + ord.cost.toFixed(2) + ")";
+          var foodAmt = ord.food || ord.cost || 0;
+          if (foodAmt > 0) {
+            if (l.tax || l.tips) {
+              // Recalculate: food + proportional tax + even tip split
+              var recalcTotal = Math.round((foodAmt + (foodAmt * histTaxRate) + histTipPer) * 100) / 100;
+              line += " ($" + recalcTotal.toFixed(2) + ")";
+            } else if (ord.cost) {
+              line += " ($" + ord.cost.toFixed(2) + ")";
+            }
           }
           orderParts.push(line);
         }
@@ -1401,12 +1416,16 @@
     if (!origLunch) return;
 
     var newOrders = [];
-    var newTotal = 0;
+    var newFoodTotal = 0;
     for (var j = 0; j < orderCount; j++) {
       var cost = parseFloat(document.getElementById("edit-cost-" + j).value) || 0;
       newOrders.push({ name: origLunch.orders[j].name, food: cost, cost: cost });
-      newTotal += cost;
+      newFoodTotal += cost;
     }
+    // Preserve tax/tips and compute true total
+    var editTax = origLunch.tax || 0;
+    var editTips = origLunch.tips || 0;
+    var newTotal = newFoodTotal + editTax + editTips;
 
     var updates = {
       date: newDate,
