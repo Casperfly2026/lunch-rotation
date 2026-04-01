@@ -409,6 +409,7 @@
     color: #fff;
     min-height: 36px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     margin-top: 10px;
@@ -1587,9 +1588,9 @@
         if (rolledResto) {
           var restoAddr = data.restoAddr || "";
           var restoDrive = data.restoDrive || "";
-          var restoHtml = '<strong>' + esc(rolledResto) + '</strong>';
-          if (restoAddr) restoHtml += '<br><span style="font-size:0.75rem;opacity:0.85">' + esc(restoAddr) + '</span>';
-          if (restoDrive) restoHtml += '<br><span style="font-size:0.7rem;opacity:0.7">~' + esc(restoDrive) + ' drive</span>';
+          var restoHtml = '<div style="font-size:1.2rem;font-weight:700">' + esc(rolledResto) + '</div>';
+          if (restoAddr) restoHtml += '<div style="font-size:0.75rem;opacity:0.85;font-weight:400;margin-top:2px">' + esc(restoAddr) + '</div>';
+          if (restoDrive) restoHtml += '<div style="font-size:0.7rem;opacity:0.7;font-weight:400">~' + esc(restoDrive) + ' drive</div>';
           document.getElementById("dice-resto").innerHTML = restoHtml;
           document.getElementById("dice-resto").classList.add("has-name");
         }
@@ -1704,7 +1705,7 @@
 
         payerEl.textContent = rolledPayer;
         driverEl.textContent = rolledDriver;
-        restoEl.innerHTML = '<strong>' + esc(pickedResto.name) + '</strong><br><span style="font-size:0.75rem;opacity:0.85">' + esc(pickedResto.addr) + '</span><br><span style="font-size:0.7rem;opacity:0.7">~' + esc(pickedResto.drive) + ' drive</span>';
+        restoEl.innerHTML = '<div style="font-size:1.2rem;font-weight:700">' + esc(pickedResto.name) + '</div><div style="font-size:0.75rem;opacity:0.85;font-weight:400;margin-top:2px">' + esc(pickedResto.addr) + '</div><div style="font-size:0.7rem;opacity:0.7;font-weight:400">~' + esc(pickedResto.drive) + ' drive</div>';
         payerEl.classList.add("has-name");
         driverEl.classList.add("has-name");
         restoEl.classList.add("has-name");
