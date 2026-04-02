@@ -523,6 +523,14 @@
   <div id="tab-new">
     <div class="dice-card">
       <h2>🎲 Who's paying, driving &amp; where?</h2>
+      <div style="margin-bottom:16px">
+        <label style="color:rgba(255,255,255,0.8);font-size:0.85rem;margin-bottom:6px">Tap to select participants</label>
+        <div id="dice-member-chips" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;justify-content:center"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;justify-content:center">
+          <button class="btn btn-sm" id="btn-dice-add-all" style="background:rgba(255,255,255,0.2);color:#fff;border:1px solid rgba(255,255,255,0.3)">Add All</button>
+          <button class="btn btn-sm" id="btn-dice-remove-all" style="background:rgba(239,68,68,0.3);color:#fff;border:1px solid rgba(239,68,68,0.4)">Remove All</button>
+        </div>
+      </div>
       <div class="dice-container">
         <div class="dice-slot">
           <div class="dice-3d" id="dice-pay-cube">
@@ -798,6 +806,7 @@
     // Orders are rendered only when members are added/removed.
     recalcAll();
     renderSuggestion();
+    if (typeof renderDiceChips === "function") renderDiceChips();
     if (currentTab === "history") renderHistory();
     if (currentTab === "stats") renderStats();
     if (currentTab === "members") renderMembers();
@@ -1570,6 +1579,82 @@
   // Members excluded from paying/driving
   var diceExcluded = ["Vickie", "Minyu"];
 
+  // Dice participant tracking
+  var diceParticipants = [];
+
+  function getEligibleMembers() {
+    var eligible = [];
+    for (var i = 0; i < appData.members.length; i++) {
+      var excluded = false;
+      for (var e = 0; e < diceExcluded.length; e++) {
+        if (appData.members[i].toLowerCase() === diceExcluded[e].toLowerCase()) { excluded = true; break; }
+      }
+      if (!excluded) eligible.push(appData.members[i]);
+    }
+    return eligible;
+  }
+
+  function renderDiceChips() {
+    var container = document.getElementById("dice-member-chips");
+    if (!container) return;
+    var eligible = getEligibleMembers();
+    container.innerHTML = "";
+    for (var i = 0; i < eligible.length; i++) {
+      var name = eligible[i];
+      var isIn = false;
+      for (var j = 0; j < diceParticipants.length; j++) {
+        if (diceParticipants[j] === name) { isIn = true; break; }
+      }
+      var chip = document.createElement("button");
+      chip.style.cssText = "display:inline-flex;align-items:center;padding:6px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s;border:1.5px solid;";
+      if (isIn) {
+        chip.style.background = "rgba(255,255,255,0.9)";
+        chip.style.color = "#4f46e5";
+        chip.style.borderColor = "#fff";
+        chip.textContent = "✓ " + name;
+      } else {
+        chip.style.background = "rgba(255,255,255,0.1)";
+        chip.style.color = "rgba(255,255,255,0.7)";
+        chip.style.borderColor = "rgba(255,255,255,0.3)";
+        chip.textContent = "+ " + name;
+      }
+      chip.onclick = (function(n) {
+        return function() {
+          var idx = -1;
+          for (var k = 0; k < diceParticipants.length; k++) {
+            if (diceParticipants[k] === n) { idx = k; break; }
+          }
+          if (idx >= 0) {
+            diceParticipants.splice(idx, 1);
+          } else {
+            diceParticipants.push(n);
+          }
+          renderDiceChips();
+        };
+      })(name);
+      container.appendChild(chip);
+    }
+    // Update roll button state
+    var btn = document.getElementById("btn-roll");
+    if (diceParticipants.length < 2) {
+      btn.style.opacity = "0.5";
+      btn.title = "Select at least 2 participants";
+    } else {
+      btn.style.opacity = "1";
+      btn.title = "";
+    }
+  }
+
+  window.diceAddAll = function() {
+    diceParticipants = getEligibleMembers().slice();
+    renderDiceChips();
+  };
+
+  window.diceRemoveAll = function() {
+    diceParticipants = [];
+    renderDiceChips();
+  };
+
   // Restaurants within ~10 min drive of 1840 Gateway Dr, San Mateo
   // Restaurants within ~10 min drive of 1840 Gateway Dr, San Mateo (verified on Google Maps)
   var nearbyRestaurants = [
@@ -1587,7 +1672,6 @@
     { name: "Inshou Cafe", addr: "2942 S Norfolk St, San Mateo", drive: "3 min" },
     { name: "Tai Wu Restaurant", addr: "1080 Foster City Blvd, Foster City", drive: "7 min" },
     { name: "Starbird Chicken", addr: "1141 Triton Dr, Foster City", drive: "7 min" },
-    { name: "McDonald's", addr: "1101 Triton Dr, Foster City", drive: "7 min" },
     { name: "Mumu Hot Pot", addr: "1099 Foster Square Ln, Foster City", drive: "9 min" }
   ];
 
@@ -1670,18 +1754,11 @@
   }
 
   function rollDice() {
-    // Filter out excluded members for pay/drive
-    var eligible = [];
+    // Use selected participants from chips
+    var eligible = diceParticipants.slice();
     var i;
-    for (i = 0; i < appData.members.length; i++) {
-      var excluded = false;
-      for (var e = 0; e < diceExcluded.length; e++) {
-        if (appData.members[i].toLowerCase() === diceExcluded[e].toLowerCase()) { excluded = true; break; }
-      }
-      if (!excluded) eligible.push(appData.members[i]);
-    }
     if (eligible.length < 2) {
-      alert("Need at least 2 eligible members to roll!");
+      alert("Select at least 2 participants to roll!");
       return;
     }
 
@@ -1781,9 +1858,18 @@
   document.getElementById("btn-roll").addEventListener("click", function() {
     rollDice();
   });
+  document.getElementById("btn-dice-add-all").addEventListener("click", function() {
+    window.diceAddAll();
+  });
+  document.getElementById("btn-dice-remove-all").addEventListener("click", function() {
+    window.diceRemoveAll();
+  });
   // Load data and saved roll, auto-refresh every 15 seconds
   loadAllData(function() {
     loadSavedRoll();
+    // Auto-select all eligible participants and render chips
+    diceParticipants = getEligibleMembers().slice();
+    renderDiceChips();
   });
   pollInterval = setInterval(loadAllData, 15000);
 
