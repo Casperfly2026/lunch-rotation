@@ -1578,14 +1578,14 @@
     { name: "Chick-fil-A", addr: "2210 Bridgepointe Pkwy, San Mateo", drive: "5 min" },
     { name: "Taqueria El Chacho", addr: "2036 Fashion Island Blvd, San Mateo", drive: "5 min" },
     { name: "Chez Xue", addr: "1000 Metro Center Blvd A, Foster City", drive: "5 min" },
-    { name: "Crumbl", addr: "1000 Metro Center Blvd D, Foster City", drive: "5 min" },
     { name: "Lazy Dog", addr: "2208 Bridgepointe Pkwy, San Mateo", drive: "6 min" },
     { name: "California Fish Grill", addr: "2214 Bridgepointe Pkwy, San Mateo", drive: "6 min" },
     { name: "BJ's Brewhouse", addr: "2206 Bridgepointe Pkwy, San Mateo", drive: "6 min" },
     { name: "Armadillo Willy's", addr: "2260 Bridgepointe Pkwy, Foster City", drive: "6 min" },
     { name: "Benihana", addr: "2204 Bridgepointe Pkwy, San Mateo", drive: "6 min" },
     { name: "Round Table Pizza", addr: "1852 S Norfolk St, San Mateo", drive: "6 min" },
-    { name: "Inshou Cafe", addr: "2942 S Norfolk St, San Mateo", drive: "7 min" },
+    { name: "Inshou Cafe", addr: "2942 S Norfolk St, San Mateo", drive: "3 min" },
+    { name: "Tai Wu Restaurant", addr: "1080 Foster City Blvd, Foster City", drive: "7 min" },
     { name: "Starbird Chicken", addr: "1141 Triton Dr, Foster City", drive: "7 min" },
     { name: "McDonald's", addr: "1101 Triton Dr, Foster City", drive: "7 min" },
     { name: "Mumu Hot Pot", addr: "1099 Foster Square Ln, Foster City", drive: "9 min" }
@@ -1618,23 +1618,38 @@
     });
   }
 
-  // Pick from members who have done the least, with randomness among ties
+  // Pick using weighted probability based on fairness
+  // People who have done it fewer times get higher weight
   function pickWeighted(members, countMap) {
     if (members.length === 0) return members[0];
-    // Find the minimum count
-    var minCount = Infinity;
+    if (members.length === 1) return members[0];
+
+    // Find max count to invert weights
+    var maxCount = 0;
     var i;
     for (i = 0; i < members.length; i++) {
       var c = countMap[members[i]] || 0;
-      if (c < minCount) minCount = c;
+      if (c > maxCount) maxCount = c;
     }
-    // Collect all members with that minimum count
-    var candidates = [];
+
+    // Weight = (maxCount + 1) - personCount
+    // So person with 0 gets highest weight, person with max gets weight 1
+    var weights = [];
+    var totalWeight = 0;
     for (i = 0; i < members.length; i++) {
-      if ((countMap[members[i]] || 0) === minCount) candidates.push(members[i]);
+      var w = (maxCount + 1) - (countMap[members[i]] || 0);
+      weights.push(w);
+      totalWeight += w;
     }
-    // Pick randomly among the candidates
-    return candidates[Math.floor(Math.random() * candidates.length)];
+
+    // Pick randomly using weights
+    var rand = Math.random() * totalWeight;
+    var cumulative = 0;
+    for (i = 0; i < members.length; i++) {
+      cumulative += weights[i];
+      if (rand < cumulative) return members[i];
+    }
+    return members[members.length - 1];
   }
 
   // Build pay/drive counts from history
