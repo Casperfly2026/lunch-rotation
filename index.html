@@ -1600,7 +1600,8 @@
     if (!container) return;
     var eligible = getEligibleMembers();
     if (!diceParticipantsInitialized && eligible.length > 0) {
-      diceParticipants = eligible.slice();
+      // Start empty — user taps to add participants
+      diceParticipants = [];
       diceParticipantsInitialized = true;
     }
     // Remove any participants no longer in eligible list
@@ -1621,15 +1622,17 @@
       var chip = document.createElement("button");
       chip.style.cssText = "display:inline-flex;align-items:center;padding:6px 14px;border-radius:20px;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.15s;border:1.5px solid;";
       if (isIn) {
-        chip.style.background = "rgba(255,255,255,0.9)";
+        chip.style.background = "#fff";
         chip.style.color = "#4f46e5";
         chip.style.borderColor = "#fff";
+        chip.style.boxShadow = "0 2px 8px rgba(255,255,255,0.3)";
         chip.textContent = "✓ " + name;
       } else {
-        chip.style.background = "rgba(255,255,255,0.1)";
-        chip.style.color = "rgba(255,255,255,0.7)";
-        chip.style.borderColor = "rgba(255,255,255,0.3)";
-        chip.textContent = "+ " + name;
+        chip.style.background = "transparent";
+        chip.style.color = "rgba(255,255,255,0.35)";
+        chip.style.borderColor = "rgba(255,255,255,0.15)";
+        chip.style.boxShadow = "none";
+        chip.textContent = name;
       }
       chip.onclick = (function(n) {
         return function() {
