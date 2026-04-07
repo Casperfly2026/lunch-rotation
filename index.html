@@ -507,9 +507,6 @@
     .tab { font-size: 0.8rem; padding: 8px 10px; }
   }
 </style>
-<!-- Firebase Auth SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 </head>
 <body>
 
@@ -517,11 +514,6 @@
   <h1>Rice &amp; Shine Squad 🍚✨</h1>
   <p>Lunch turns for paying and driving</p>
   <div class="sync-status" id="sync-status">Connecting...</div>
-  <div id="auth-bar" style="margin-top:8px;">
-    <button id="btn-sign-in" onclick="window.__signIn()" style="display:none;background:rgba(255,255,255,0.2);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:20px;padding:5px 16px;font-size:0.8rem;cursor:pointer;">🔑 Sign in to edit</button>
-    <span id="auth-user" style="display:none;font-size:0.8rem;opacity:0.85;"></span>
-    <button id="btn-sign-out" onclick="window.__signOut()" style="display:none;background:rgba(255,255,255,0.15);color:white;border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:4px 12px;font-size:0.75rem;cursor:pointer;margin-left:8px;">Sign out</button>
-  </div>
 </div>
 
 <div class="container">
@@ -652,66 +644,7 @@
 (function() {
   "use strict";
 
-  // Firebase config & Auth setup
-  var firebaseConfig = {
-    apiKey: "AIzaSyC3EvS44Q2Hn3qGHUU8RtrzctWG2ioLZuI",
-    authDomain: "lunch-rotation-9c174.firebaseapp.com",
-    databaseURL: "https://lunch-rotation-9c174-default-rtdb.firebaseio.com",
-    projectId: "lunch-rotation-9c174",
-    storageBucket: "lunch-rotation-9c174.firebasestorage.app",
-    messagingSenderId: "108583375577",
-    appId: "1:108583375577:web:49faf7706fa71d2a2724c8"
-  };
-  firebase.initializeApp(firebaseConfig);
-  var auth = firebase.auth();
-  var googleProvider = new firebase.auth.GoogleAuthProvider();
-
-  var currentUser = null;
-
-  // Auth UI
-  function updateAuthUI() {
-    var btnIn = document.getElementById("btn-sign-in");
-    var spanUser = document.getElementById("auth-user");
-    var btnOut = document.getElementById("btn-sign-out");
-    if (currentUser) {
-      btnIn.style.display = "none";
-      spanUser.style.display = "inline";
-      spanUser.textContent = "Signed in as " + currentUser.email;
-      btnOut.style.display = "inline";
-    } else {
-      btnIn.style.display = "inline";
-      spanUser.style.display = "none";
-      btnOut.style.display = "none";
-    }
-  }
-
-  auth.onAuthStateChanged(function(user) {
-    currentUser = user;
-    updateAuthUI();
-  });
-
-  window.__signIn = function() {
-    auth.signInWithPopup(googleProvider).catch(function(err) {
-      alert("Sign-in failed: " + err.message);
-    });
-  };
-  window.__signOut = function() {
-    auth.signOut();
-  };
-
-  // Get auth token for write operations
-  function getAuthToken(callback) {
-    if (!currentUser) {
-      alert("Please sign in to make changes.");
-      return;
-    }
-    currentUser.getIdToken().then(function(token) {
-      callback(token);
-    }).catch(function(err) {
-      alert("Auth error: " + err.message);
-    });
-  }
-
+  // Firebase REST API - no SDK needed
   var DB_URL = "https://lunch-rotation-9c174-default-rtdb.firebaseio.com";
 
   var appData = { members: [], lunches: [], venmo: {} };
@@ -719,7 +652,6 @@
   var pollInterval = null;
 
   // REST API helpers
-  // Read is public — no auth needed
   function fbGet(path, callback) {
     fetch(DB_URL + "/" + path + ".json")
       .then(function(res) {
@@ -737,65 +669,44 @@
       .catch(function(err) { callback(err, null); });
   }
 
-  // Write operations require auth token
   function fbPut(path, data, callback) {
-    getAuthToken(function(token) {
-      fetch(DB_URL + "/" + path + ".json?auth=" + token, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-      .then(function(res) { return res.json(); })
-      .then(function(result) {
-        if (result && result.error) { alert("Write denied: " + result.error); return; }
-        if (callback) callback(null, result);
-      })
-      .catch(function(err) { if (callback) callback(err, null); });
-    });
+    fetch(DB_URL + "/" + path + ".json", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
   }
 
   function fbPost(path, data, callback) {
-    getAuthToken(function(token) {
-      fetch(DB_URL + "/" + path + ".json?auth=" + token, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-      .then(function(res) { return res.json(); })
-      .then(function(result) {
-        if (result && result.error) { alert("Write denied: " + result.error); return; }
-        if (callback) callback(null, result);
-      })
-      .catch(function(err) { if (callback) callback(err, null); });
-    });
+    fetch(DB_URL + "/" + path + ".json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
   }
 
   function fbDelete(path, callback) {
-    getAuthToken(function(token) {
-      fetch(DB_URL + "/" + path + ".json?auth=" + token, { method: "DELETE" })
-      .then(function(res) { return res.json(); })
-      .then(function(result) {
-        if (result && result.error) { alert("Write denied: " + result.error); return; }
-        if (callback) callback(null, result);
-      })
-      .catch(function(err) { if (callback) callback(err, null); });
-    });
+    fetch(DB_URL + "/" + path + ".json", { method: "DELETE" })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
   }
 
   function fbPatch(path, data, callback) {
-    getAuthToken(function(token) {
-      fetch(DB_URL + "/" + path + ".json?auth=" + token, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-      .then(function(res) { return res.json(); })
-      .then(function(result) {
-        if (result && result.error) { alert("Write denied: " + result.error); return; }
-        if (callback) callback(null, result);
-      })
-      .catch(function(err) { if (callback) callback(err, null); });
-    });
+    fetch(DB_URL + "/" + path + ".json", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(result) { if (callback) callback(null, result); })
+    .catch(function(err) { if (callback) callback(err, null); });
   }
 
   // Local date helper (avoids UTC timezone issues with toISOString)
