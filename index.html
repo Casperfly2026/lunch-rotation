@@ -363,6 +363,40 @@
     margin: 20px 0;
     flex-wrap: wrap;
   }
+  .dice-member-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 8px 0;
+    padding: 0 8px;
+  }
+  .dice-chip {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    border: 1.5px solid rgba(255,255,255,0.15);
+    background: transparent;
+    color: rgba(255,255,255,0.35);
+    transition: all 0.18s ease;
+  }
+  .dice-chip.selected {
+    background: #fff;
+    color: #4f46e5;
+    border-color: #fff;
+    box-shadow: 0 2px 8px rgba(255,255,255,0.3);
+  }
+  .dice-chip-label {
+    width: 100%;
+    text-align: center;
+    font-size: 0.78rem;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 4px;
+    letter-spacing: 0.02em;
+  }
   .dice-slot {
     text-align: center;
     display: flex;
@@ -522,6 +556,8 @@
   <div id="tab-new">
     <div class="dice-card">
       <h2>🎲 Who's paying, driving &amp; where?</h2>
+      <div class="dice-chip-label">Tap names to add who's joining today</div>
+      <div class="dice-member-chips" id="dice-member-chips"></div>
       <div class="dice-container">
         <div class="dice-slot">
           <div class="dice-3d" id="dice-pay-cube">
@@ -797,6 +833,7 @@
     // Orders are rendered only when members are added/removed.
     recalcAll();
     renderSuggestion();
+    renderDiceChips();
     if (currentTab === "history") renderHistory();
     if (currentTab === "stats") renderStats();
     if (currentTab === "members") renderMembers();
@@ -1531,7 +1568,65 @@
   var rolledResto = "";
 
   // Members excluded from paying/driving
-  var diceExcluded = ["Vickie", "Minyu"];
+  var diceExcluded = ["Minyu"];
+
+  // Participants for today's roll — users tap to add
+  var diceParticipants = [];
+
+  function getEligibleMembers() {
+    var out = [];
+    for (var i = 0; i < appData.members.length; i++) {
+      var excluded = false;
+      for (var e = 0; e < diceExcluded.length; e++) {
+        if (appData.members[i].toLowerCase() === diceExcluded[e].toLowerCase()) { excluded = true; break; }
+      }
+      if (!excluded) out.push(appData.members[i]);
+    }
+    return out;
+  }
+
+  function renderDiceChips() {
+    var container = document.getElementById("dice-member-chips");
+    if (!container) return;
+    var eligible = getEligibleMembers();
+
+    // Remove any stale participants that are no longer eligible
+    for (var r = diceParticipants.length - 1; r >= 0; r--) {
+      var still = false;
+      for (var s = 0; s < eligible.length; s++) {
+        if (diceParticipants[r] === eligible[s]) { still = true; break; }
+      }
+      if (!still) diceParticipants.splice(r, 1);
+    }
+
+    var html = "";
+    for (var i = 0; i < eligible.length; i++) {
+      var name = eligible[i];
+      var isSel = false;
+      for (var j = 0; j < diceParticipants.length; j++) {
+        if (diceParticipants[j] === name) { isSel = true; break; }
+      }
+      var cls = isSel ? "dice-chip selected" : "dice-chip";
+      var label = isSel ? ("✓ " + esc(name)) : esc(name);
+      html += '<span class="' + cls + '" data-name="' + esc(name) + '">' + label + '</span>';
+    }
+    container.innerHTML = html;
+
+    // Wire up clicks
+    var chips = container.querySelectorAll(".dice-chip");
+    for (var k = 0; k < chips.length; k++) {
+      chips[k].addEventListener("click", function() {
+        var n = this.getAttribute("data-name");
+        var idx = -1;
+        for (var a = 0; a < diceParticipants.length; a++) {
+          if (diceParticipants[a] === n) { idx = a; break; }
+        }
+        if (idx >= 0) diceParticipants.splice(idx, 1);
+        else diceParticipants.push(n);
+        renderDiceChips();
+      });
+    }
+  }
 
   // Restaurants within ~10 min drive of 1840 Gateway Dr, San Mateo
   // Restaurants within ~10 min drive of 1840 Gateway Dr, San Mateo (verified on Google Maps)
@@ -1618,18 +1713,10 @@
   }
 
   function rollDice() {
-    // Filter out excluded members for pay/drive
-    var eligible = [];
-    var i;
-    for (i = 0; i < appData.members.length; i++) {
-      var excluded = false;
-      for (var e = 0; e < diceExcluded.length; e++) {
-        if (appData.members[i].toLowerCase() === diceExcluded[e].toLowerCase()) { excluded = true; break; }
-      }
-      if (!excluded) eligible.push(appData.members[i]);
-    }
+    // Use only members the user tapped to participate today
+    var eligible = diceParticipants.slice();
     if (eligible.length < 2) {
-      alert("Need at least 2 eligible members to roll!");
+      alert("Tap at least 2 names above to add who's joining today!");
       return;
     }
 
