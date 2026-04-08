@@ -1806,7 +1806,6 @@
     { name: "Chick-fil-A", addr: "2210 Bridgepointe Pkwy, San Mateo", drive: "5 min" },
     { name: "Taqueria El Chacho", addr: "2036 Fashion Island Blvd, San Mateo", drive: "5 min" },
     { name: "Chez Xue", addr: "1000 Metro Center Blvd A, Foster City", drive: "5 min" },
-    { name: "Crumbl", addr: "1000 Metro Center Blvd D, Foster City", drive: "5 min" },
     { name: "Lazy Dog", addr: "2208 Bridgepointe Pkwy, San Mateo", drive: "6 min" },
     { name: "California Fish Grill", addr: "2214 Bridgepointe Pkwy, San Mateo", drive: "6 min" },
     { name: "BJ's Brewhouse", addr: "2206 Bridgepointe Pkwy, San Mateo", drive: "6 min" },
@@ -1923,18 +1922,16 @@
       if (shuffleCount >= totalShuffles) {
         clearInterval(shuffleInterval);
 
-        // Use history to pick fairly — prioritize those who have done the least
-        var counts = getDiceCounts();
+        // Pure random pick — no fairness weighting
+        rolledPayer = eligible[Math.floor(Math.random() * eligible.length)];
 
-        rolledPayer = pickWeighted(eligible, counts.pay);
-
-        // For driver, pick from remaining eligible (exclude payer)
+        // For driver, pick randomly from remaining eligible (exclude payer)
         var driverPool = [];
         for (var dp = 0; dp < eligible.length; dp++) {
           if (eligible[dp] !== rolledPayer) driverPool.push(eligible[dp]);
         }
         if (driverPool.length > 0) {
-          rolledDriver = pickWeighted(driverPool, counts.drive);
+          rolledDriver = driverPool[Math.floor(Math.random() * driverPool.length)];
         } else {
           rolledDriver = rolledPayer;
         }
