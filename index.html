@@ -559,6 +559,10 @@
       <h2>🎲 Who's paying, driving &amp; where?</h2>
       <div class="dice-chip-label">Tap names to add who's joining today</div>
       <div class="dice-member-chips" id="dice-member-chips"></div>
+      <div class="dice-member-chips" style="margin-top:4px">
+        <span class="dice-chip" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.4)" onclick="window.__diceAddAll()">+ Add all</span>
+        <span class="dice-chip" style="background:rgba(255,255,255,0.15);color:#fff;border-color:rgba(255,255,255,0.4)" onclick="window.__diceRemoveAll()">− Remove all</span>
+      </div>
       <div class="dice-container">
         <div class="dice-slot">
           <div class="dice-3d" id="dice-pay-cube">
@@ -1601,6 +1605,15 @@
 
   // Participants for today's roll — users tap to add
   var diceParticipants = [];
+
+  window.__diceAddAll = function() {
+    diceParticipants = getEligibleMembers().slice();
+    renderDiceChips();
+  };
+  window.__diceRemoveAll = function() {
+    diceParticipants = [];
+    renderDiceChips();
+  };
 
   function getEligibleMembers() {
     var out = [];
