@@ -1654,7 +1654,7 @@
   }
 
   function renderTrendChart(title, dates, members, seriesMap, colors) {
-    var W = 640, H = 260, padL = 40, padR = 12, padT = 24, padB = 40;
+    var W = 640, H = 260, padL = 40, padR = 70, padT = 24, padB = 40;
     var plotW = W - padL - padR;
     var plotH = H - padT - padB;
     // Find max y
@@ -1688,20 +1688,28 @@
       svg += '<text x="' + xl + '" y="' + (H - padB + 14) + '" text-anchor="middle" font-size="9" fill="#6b7280">' + esc(dates[di].slice(5)) + '</text>';
     }
 
-    // Draw line per member
+    // Draw dots per member + end-label with name
+    // Track end positions so we can stagger labels that overlap
+    var endPositions = [];
     for (var mi = 0; mi < members.length; mi++) {
       var color = colors[mi % colors.length];
       var series = seriesMap[members[mi]];
-      var path = "";
+      // Draw a dot at each data point
       for (var pi = 0; pi < series.length; pi++) {
-        path += (pi === 0 ? "M" : "L") + xAt(pi).toFixed(1) + "," + yAt(series[pi]).toFixed(1) + " ";
+        svg += '<circle cx="' + xAt(pi).toFixed(1) + '" cy="' + yAt(series[pi]).toFixed(1) + '" r="3" fill="' + color + '" fill-opacity="0.85"/>';
       }
-      svg += '<path d="' + path + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
-      // End-point dot + label
+      // End-point: bigger dot + name label
       if (series.length > 0) {
         var lastX = xAt(series.length - 1);
         var lastY = yAt(series[series.length - 1]);
-        svg += '<circle cx="' + lastX + '" cy="' + lastY + '" r="3" fill="' + color + '"/>';
+        // Stagger y if another label is within 12px
+        var labelY = lastY + 3;
+        for (var ep = 0; ep < endPositions.length; ep++) {
+          if (Math.abs(labelY - endPositions[ep]) < 12) labelY = endPositions[ep] + 12;
+        }
+        endPositions.push(labelY);
+        svg += '<circle cx="' + lastX + '" cy="' + lastY + '" r="4.5" fill="' + color + '" stroke="#fff" stroke-width="1.5"/>';
+        svg += '<text x="' + (lastX + 8) + '" y="' + labelY + '" font-size="10" font-weight="600" fill="' + color + '">' + esc(members[mi]) + '</text>';
       }
     }
     svg += '</svg>';
