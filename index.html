@@ -1359,7 +1359,7 @@
         var orders = l.orders || [];
         for (var oi = 0; oi < orders.length; oi++) {
           var o = orders[oi];
-          var editCostVal = (o.food ? o.food : o.cost || 0).toFixed(2);
+          var editCostVal = (o.cost !== undefined && o.cost !== null ? o.cost : (o.food || 0)).toFixed(2);
           html += '<div class="edit-order-row" style="grid-template-columns:1fr auto">' +
             '<strong style="font-size:0.85rem">' + esc(o.name) + '</strong>' +
             '<input type="number" id="edit-cost-' + oi + '" value="' + editCostVal + '" step="0.01" min="0" style="width:100px" placeholder="$0.00">' +
@@ -1414,7 +1414,15 @@
         '<td data-label="Payer"><span class="badge badge-pay">' + esc(l.payer) + '</span>' + venmoPayLink + '</td>' +
         '<td data-label="Driver"><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
         '<td data-label="Orders" style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
-        '<td data-label="Total"><strong>$' + (l.total || 0).toFixed(2) + '</strong></td>' +
+        '<td data-label="Total"><strong>$' + (l.total || 0).toFixed(2) + '</strong>' +
+          (function() {
+            var tx = l.tax || 0;
+            var tp = l.tips || 0;
+            var bill = (l.total || 0) - tx - tp;
+            if (bill <= 0 && tx === 0 && tp === 0) return "";
+            return '<div style="font-size:0.7rem;color:var(--gray-500);font-weight:500;margin-top:2px">($' + bill.toFixed(2) + ' bill, $' + tx.toFixed(2) + ' tax, $' + tp.toFixed(2) + ' tips)</div>';
+          })() +
+        '</td>' +
         '<td data-label="Rating">' + starsHtml + '</td>' +
         '<td data-label="">' +
           '<button class="edit-btn" onclick="editLunch(\'' + key + '\')" title="Edit">Edit</button> ' +
@@ -1456,6 +1464,7 @@
     var newTotal = 0;
     for (var j = 0; j < orderCount; j++) {
       var cost = parseFloat(document.getElementById("edit-cost-" + j).value) || 0;
+      // Treat the edited value as the person's final total (incl. tax/tip share)
       newOrders.push({ name: origLunch.orders[j].name, food: cost, cost: cost });
       newTotal += cost;
     }
@@ -1466,7 +1475,9 @@
       payer: newPayer,
       driver: newDriver,
       orders: newOrders,
-      total: newTotal
+      total: newTotal,
+      tax: 0,
+      tips: 0
     };
 
     fbPatch("lunches/" + key, updates, function() {
@@ -1661,7 +1672,10 @@
     { name: "Inshou Cafe", addr: "2942 S Norfolk St, San Mateo", drive: "7 min" },
     { name: "Starbird Chicken", addr: "1141 Triton Dr, Foster City", drive: "7 min" },
     { name: "McDonald's", addr: "1101 Triton Dr, Foster City", drive: "7 min" },
-    { name: "Mumu Hot Pot", addr: "1099 Foster Square Ln, Foster City", drive: "9 min" }
+    { name: "Mumu Hot Pot", addr: "1099 Foster Square Ln, Foster City", drive: "9 min" },
+    { name: "Amigos Grill", addr: "2974 S Norfolk St, San Mateo", drive: "7 min" },
+    { name: "Myung Dong Tofu Cabin", addr: "2968 S Norfolk St, San Mateo", drive: "7 min" },
+    { name: "Hot Wok Cafe", addr: "2960 S Norfolk St, San Mateo", drive: "7 min" }
   ];
 
   // Load saved roll from Firebase
