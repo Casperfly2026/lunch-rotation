@@ -1408,21 +1408,24 @@
         starsHtml += '<span class="avg-rating">' + avgRating.toFixed(1) + ' (' + ratingKeys.length + ')</span>';
       }
 
+      // Build total breakdown: show bill/tax/tips under the grand total
+      var lunchTotal = l.total || 0;
+      var lunchTax = l.tax || 0;
+      var lunchTips = l.tips || 0;
+      var lunchBill = lunchTotal - lunchTax - lunchTips;
+      if (lunchBill < 0) lunchBill = 0;
+      var breakdownHtml = "";
+      if (lunchTotal > 0) {
+        breakdownHtml = '<div style="font-size:0.7rem;color:var(--gray-500);font-weight:500;margin-top:2px;white-space:nowrap">($' + lunchBill.toFixed(2) + ' bill, $' + lunchTax.toFixed(2) + ' tax, $' + lunchTips.toFixed(2) + ' tips)</div>';
+      }
+
       html += '<tr>' +
         '<td data-label="Date">' + esc(l.date) + '</td>' +
         '<td data-label="Place">' + esc(l.place || "-") + '</td>' +
         '<td data-label="Payer"><span class="badge badge-pay">' + esc(l.payer) + '</span>' + venmoPayLink + '</td>' +
         '<td data-label="Driver"><span class="badge badge-drive">' + esc(l.driver) + '</span></td>' +
         '<td data-label="Orders" style="font-size:0.82rem">' + orderParts.join("<br>") + '</td>' +
-        '<td data-label="Total"><strong>$' + (l.total || 0).toFixed(2) + '</strong>' +
-          (function() {
-            var tx = l.tax || 0;
-            var tp = l.tips || 0;
-            var bill = (l.total || 0) - tx - tp;
-            if (bill <= 0 && tx === 0 && tp === 0) return "";
-            return '<div style="font-size:0.7rem;color:var(--gray-500);font-weight:500;margin-top:2px">($' + bill.toFixed(2) + ' bill, $' + tx.toFixed(2) + ' tax, $' + tp.toFixed(2) + ' tips)</div>';
-          })() +
-        '</td>' +
+        '<td data-label="Total"><strong>$' + lunchTotal.toFixed(2) + '</strong>' + breakdownHtml + '</td>' +
         '<td data-label="Rating">' + starsHtml + '</td>' +
         '<td data-label="">' +
           '<button class="edit-btn" onclick="editLunch(\'' + key + '\')" title="Edit">Edit</button> ' +
