@@ -718,14 +718,26 @@
   }
 
   function fbPost(path, data, callback) {
+    console.log("[fbPost]", path, data);
     fetch(DB_URL + "/" + path + ".json", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     })
-    .then(function(res) { return res.json(); })
-    .then(function(result) { if (callback) callback(null, result); })
-    .catch(function(err) { if (callback) callback(err, null); });
+    .then(function(res) {
+      if (!res.ok) throw new Error("HTTP " + res.status + " " + res.statusText);
+      return res.json();
+    })
+    .then(function(result) {
+      console.log("[fbPost result]", result);
+      if (result && result.error) throw new Error(result.error);
+      if (callback) callback(null, result);
+    })
+    .catch(function(err) {
+      console.error("[fbPost error]", err);
+      alert("Save failed: " + err.message);
+      if (callback) callback(err, null);
+    });
   }
 
   function fbDelete(path, callback) {
@@ -1262,7 +1274,9 @@
       id: Date.now()
     };
 
-    fbPost("lunches", lunchData, function() {
+    console.log("[saveLunch] submitting", lunchData);
+    fbPost("lunches", lunchData, function(err) {
+      if (err) return; // fbPost already alerted
       // Reload data first so suggestion updates with new entry
       loadAllData(function() {
         // Reset form AFTER data is reloaded
