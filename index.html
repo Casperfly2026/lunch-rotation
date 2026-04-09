@@ -245,12 +245,9 @@
       font-size: 0.82rem;
       display: flex;
       justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
-      gap: 2px;
+      align-items: center;
       overflow-wrap: break-word;
       word-break: break-word;
-      max-width: 100%;
     }
     .history-table td:before {
       content: attr(data-label);
@@ -261,18 +258,18 @@
       min-width: 60px;
       flex-shrink: 0;
     }
-    .history-table td > span,
-    .history-table td > div {
+    /* Orders and Total cells: stack label on top, content below */
+    .history-table td[data-label="Orders"],
+    .history-table td[data-label="Total"] {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+    .history-table td[data-label="Orders"] > *,
+    .history-table td[data-label="Total"] > * {
       max-width: 100%;
       overflow-wrap: break-word;
       word-break: break-word;
-    }
-    .history-table td[data-label="Total"] span,
-    .history-table td[data-label="Orders"] span {
-      font-size: 0.78rem;
-      text-align: right;
-      flex: 1;
-      min-width: 0;
     }
     .edit-row td { flex-direction: column; align-items: stretch; }
     .edit-row td:before { display: none; }
@@ -1707,7 +1704,7 @@
                 var own = ord.ownFood !== undefined ? ord.ownFood : (pFood - ord.sharedFood);
                 foodLabel = '$' + own.toFixed(2) + ' + $' + ord.sharedFood.toFixed(2) + ' shared';
               }
-              line += '<span style="font-size:0.7rem;color:var(--gray-400);margin-left:2px">(' + foodLabel + ' + $' + pTax.toFixed(2) + ' tax + $' + pTip.toFixed(2) + ' tip)</span>';
+              line += '<br><span style="font-size:0.65rem;color:var(--gray-400)">(' + foodLabel + ' + $' + pTax.toFixed(2) + ' tax + $' + pTip.toFixed(2) + ' tip)</span>';
             }
           }
           orderParts.push(line);
