@@ -1291,6 +1291,18 @@
     window.recalcAll();
   };
 
+  window.__selectAllSharers = function(itemIdx) {
+    sharedItems[itemIdx].sharers = orderMembers.slice();
+    renderSharedFood();
+    window.recalcAll();
+  };
+
+  window.__clearSharers = function(itemIdx) {
+    sharedItems[itemIdx].sharers = [];
+    renderSharedFood();
+    window.recalcAll();
+  };
+
   window.__updateSharedItem = function(idx, field, val) {
     if (field === "name") sharedItems[idx].name = val;
     else if (field === "cost") sharedItems[idx].cost = parseFloat(val) || 0;
@@ -1310,7 +1322,21 @@
       html += '<input type="number" placeholder="$0.00" value="' + (item.cost > 0 ? item.cost.toFixed(2) : "") + '" min="0" step="0.01" oninput="window.__updateSharedItem(' + si + ',\'cost\',this.value)" style="width:90px;padding:6px 8px;font-size:0.85rem">';
       html += '<button onclick="window.__removeSharedItem(' + si + ')" style="background:none;border:none;color:var(--danger);font-size:1.1rem;cursor:pointer;padding:0 4px" title="Remove">&times;</button>';
       html += '</div>';
-      html += '<div style="font-size:0.78rem;color:var(--gray-500);margin-bottom:4px">Split between:</div>';
+      // Remove stale sharers not in orderMembers
+      for (var cl = item.sharers.length - 1; cl >= 0; cl--) {
+        var stillIn = false;
+        for (var cm = 0; cm < orderMembers.length; cm++) {
+          if (item.sharers[cl] === orderMembers[cm]) { stillIn = true; break; }
+        }
+        if (!stillIn) item.sharers.splice(cl, 1);
+      }
+      html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">';
+      html += '<span style="font-size:0.78rem;color:var(--gray-500)">Split between:</span>';
+      if (orderMembers.length > 0) {
+        html += '<span style="font-size:0.72rem;color:var(--primary);cursor:pointer;text-decoration:underline" onclick="window.__selectAllSharers(' + si + ')">Select all</span>';
+        html += '<span style="font-size:0.72rem;color:var(--gray-400);cursor:pointer;text-decoration:underline" onclick="window.__clearSharers(' + si + ')">Clear</span>';
+      }
+      html += '</div>';
       html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
       for (var m = 0; m < orderMembers.length; m++) {
         var isSharer = false;
@@ -1609,8 +1635,20 @@
             '<input type="number" id="edit-cost-' + oi + '" value="' + editCostVal + '" step="0.01" min="0" style="width:100px" placeholder="$0.00">' +
             '</div>';
         }
+        // Receipt upload in edit mode
+        html += '<div style="margin-top:12px">';
+        html += '<label style="font-size:0.85rem;font-weight:600">Receipt / Invoice</label>';
+        if (l.receiptUrl) {
+          html += '<div style="margin-top:6px;margin-bottom:6px"><img class="receipt-thumb" src="' + esc(l.receiptUrl) + '" onclick="window.__showReceipt(\'' + esc(l.receiptUrl) + '\')" style="max-width:80px;max-height:80px"> <span style="font-size:0.78rem;color:var(--gray-500)">Current receipt — upload new to replace</span></div>';
+        }
+        html += '<div class="receipt-upload-area" style="padding:10px" onclick="document.getElementById(\'edit-receipt-file\').click()">';
+        html += '<div id="edit-receipt-preview-text" style="font-size:0.82rem">📷 Tap to upload receipt</div>';
+        html += '<div id="edit-receipt-preview-img"></div>';
+        html += '<input type="file" id="edit-receipt-file" accept="image/*" style="display:none" onchange="window.__previewEditReceipt(this)">';
+        html += '</div></div>';
+
         html += '<div style="margin-top:10px;display:flex;gap:8px">' +
-          '<button class="btn btn-success btn-sm" onclick="saveEdit(\'' + key + '\',' + orders.length + ')">Save</button>' +
+          '<button class="btn btn-success btn-sm" id="edit-save-btn" onclick="saveEdit(\'' + key + '\',' + orders.length + ')">Save</button>' +
           '<button class="btn btn-sm" onclick="cancelEdit()" style="background:var(--gray-200);color:var(--gray-700)">Cancel</button>' +
           '</div>';
         html += '</td></tr>';
@@ -1706,13 +1744,29 @@
     container.innerHTML = html;
   }
 
+  var editReceiptFile = null;
+
+  window.__previewEditReceipt = function(input) {
+    if (input.files && input.files[0]) {
+      editReceiptFile = input.files[0];
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("edit-receipt-preview-img").innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:150px;border-radius:6px;margin-top:6px">';
+        document.getElementById("edit-receipt-preview-text").textContent = "✓ New receipt attached";
+      };
+      reader.readAsDataURL(editReceiptFile);
+    }
+  };
+
   window.editLunch = function(key) {
     editingKey = key;
+    editReceiptFile = null;
     renderHistory();
   };
 
   window.cancelEdit = function() {
     editingKey = null;
+    editReceiptFile = null;
     renderHistory();
   };
 
@@ -1736,7 +1790,6 @@
     var newTotal = 0;
     for (var j = 0; j < orderCount; j++) {
       var cost = parseFloat(document.getElementById("edit-cost-" + j).value) || 0;
-      // Treat the edited value as the person's final total (incl. tax/tip share)
       newOrders.push({ name: origLunch.orders[j].name, food: cost, cost: cost });
       newTotal += cost;
     }
@@ -1752,9 +1805,21 @@
       tips: 0
     };
 
-    fbPatch("lunches/" + key, updates, function() {
-      editingKey = null;
-      loadAllData();
+    var saveBtnEl = document.getElementById("edit-save-btn");
+    if (saveBtnEl) { saveBtnEl.textContent = "Saving..."; saveBtnEl.disabled = true; }
+
+    // Upload new receipt if selected, otherwise keep existing
+    uploadReceipt(editReceiptFile, origLunch.id || Date.now(), function(uploadErr, receiptUrl) {
+      if (receiptUrl) {
+        updates.receiptUrl = receiptUrl;
+      }
+      if (uploadErr) console.warn("Receipt upload failed:", uploadErr);
+
+      fbPatch("lunches/" + key, updates, function() {
+        editingKey = null;
+        editReceiptFile = null;
+        loadAllData();
+      });
     });
   };
 
