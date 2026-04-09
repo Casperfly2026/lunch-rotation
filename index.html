@@ -675,6 +675,16 @@
         </div>
         <div id="orders-list"></div>
       </div>
+      <div style="margin-bottom:12px">
+        <div style="font-weight:600;font-size:0.9rem;margin-bottom:8px;color:var(--gray-700)">Step 3: Shared food (optional)</div>
+        <p style="font-size:0.8rem;color:var(--gray-500);margin-bottom:10px">Add dishes shared between people. Cost is split evenly among sharers, with proportional tax &amp; tip.</p>
+        <div id="shared-food-list"></div>
+        <button class="btn btn-sm" style="background:var(--primary-bg);color:var(--primary);margin-top:8px" onclick="window.__addSharedItem()">+ Add shared dish</button>
+      </div>
+      <div id="share-adjustments" style="display:none;margin-bottom:12px;background:var(--primary-bg);border-radius:8px;padding:12px 14px">
+        <div style="font-weight:600;font-size:0.85rem;color:var(--primary);margin-bottom:6px">📊 Per-person adjustments from shared food</div>
+        <div id="share-adj-details" style="font-size:0.82rem;color:var(--gray-700)"></div>
+      </div>
       <div id="validation-msg" style="display:none;border-radius:8px;padding:10px 14px;font-size:0.85rem;margin-bottom:8px"></div>
       <span id="order-total" style="display:none">$0.00</span>
     </div>
@@ -1110,24 +1120,28 @@
     orderMembers.push(name);
     populateOrdererDropdown();
     renderOrders();
+    renderSharedFood();
   };
 
   window.addAllOrderers = function() {
     orderMembers = appData.members.slice();
     populateOrdererDropdown();
     renderOrders();
+    renderSharedFood();
   };
 
   window.removeOrderer = function(idx) {
     orderMembers.splice(idx, 1);
     populateOrdererDropdown();
     renderOrders();
+    renderSharedFood();
   };
 
   window.removeAllOrderers = function() {
     orderMembers = [];
     populateOrdererDropdown();
     renderOrders();
+    renderSharedFood();
   };
 
   // Recalculate: tax as ratio on each person's food, tips split evenly
@@ -1144,10 +1158,16 @@
       if (el) sumFood += (parseFloat(el.value) || 0);
     }
 
-    // Auto-fill order total from individual amounts if payer hasn't manually typed it
-    if (!bulkTotalEl.dataset.manual && sumFood > 0) {
-      orderTotal = sumFood;
-      bulkTotalEl.value = sumFood.toFixed(2);
+    // Add shared food totals
+    var sharedTotals = getSharedFoodPerPerson();
+    var totalSharedFood = 0;
+    for (var sk in sharedTotals) { totalSharedFood += sharedTotals[sk]; }
+    var allFood = sumFood + totalSharedFood;
+
+    // Auto-fill order total from individual + shared amounts if payer hasn't manually typed it
+    if (!bulkTotalEl.dataset.manual && allFood > 0) {
+      orderTotal = allFood;
+      bulkTotalEl.value = allFood.toFixed(2);
     }
 
     // Update bill total display
@@ -1160,8 +1180,9 @@
     // Tips proportional to food cost
     var tipRate = orderTotal > 0 ? (tips / orderTotal) : 0;
 
-    // Calculate each person's columns
+    // Calculate each person's columns (individual food + shared food)
     var sumIndividual = 0;
+    var adjHtml = "";
     for (var j = 0; j < orderMembers.length; j++) {
       var costEl = document.getElementById("order-cost-" + j);
       var taxEl = document.getElementById("order-tax-" + j);
@@ -1169,7 +1190,9 @@
       var totalEl = document.getElementById("order-total-" + j);
       if (!costEl) continue;
 
-      var food = parseFloat(costEl.value) || 0;
+      var ownFood = parseFloat(costEl.value) || 0;
+      var sharedFood = sharedTotals[orderMembers[j]] || 0;
+      var food = ownFood + sharedFood;
       var personTax = Math.round((food * taxRate) * 100) / 100;
       var personTip = Math.round((food * tipRate) * 100) / 100;
       var personTotal = Math.round((food + personTax + personTip) * 100) / 100;
@@ -1178,6 +1201,22 @@
       if (taxEl) taxEl.textContent = food > 0 ? "$" + personTax.toFixed(2) : "-";
       if (tipEl) tipEl.textContent = food > 0 ? "$" + personTip.toFixed(2) : "-";
       if (totalEl) totalEl.textContent = food > 0 ? "$" + personTotal.toFixed(2) : "-";
+
+      if (sharedFood > 0) {
+        adjHtml += '<div>' + esc(orderMembers[j]) + ': +$' + sharedFood.toFixed(2) + ' shared food → total food $' + food.toFixed(2) + ' → <strong>$' + personTotal.toFixed(2) + '</strong></div>';
+      }
+    }
+
+    // Show/hide shared food adjustments
+    var adjPanel = document.getElementById("share-adjustments");
+    var adjDetails = document.getElementById("share-adj-details");
+    if (adjPanel && adjDetails) {
+      if (adjHtml) {
+        adjPanel.style.display = "block";
+        adjDetails.innerHTML = adjHtml;
+      } else {
+        adjPanel.style.display = "none";
+      }
     }
 
     document.getElementById("order-total").textContent = "$" + sumIndividual.toFixed(2);
@@ -1225,6 +1264,92 @@
     }
     window.recalcAll();
   };
+
+  // === Shared food items ===
+  var sharedItems = []; // Each: { name: "Gyoza", cost: 12.50, sharers: ["Ping","Bill"] }
+
+  window.__addSharedItem = function() {
+    sharedItems.push({ name: "", cost: 0, sharers: [] });
+    renderSharedFood();
+  };
+
+  window.__removeSharedItem = function(idx) {
+    sharedItems.splice(idx, 1);
+    renderSharedFood();
+    window.recalcAll();
+  };
+
+  window.__toggleSharer = function(itemIdx, memberName) {
+    var item = sharedItems[itemIdx];
+    var pos = -1;
+    for (var i = 0; i < item.sharers.length; i++) {
+      if (item.sharers[i] === memberName) { pos = i; break; }
+    }
+    if (pos >= 0) item.sharers.splice(pos, 1);
+    else item.sharers.push(memberName);
+    renderSharedFood();
+    window.recalcAll();
+  };
+
+  window.__updateSharedItem = function(idx, field, val) {
+    if (field === "name") sharedItems[idx].name = val;
+    else if (field === "cost") sharedItems[idx].cost = parseFloat(val) || 0;
+    window.recalcAll();
+  };
+
+  function renderSharedFood() {
+    var container = document.getElementById("shared-food-list");
+    if (!container) return;
+    if (sharedItems.length === 0) { container.innerHTML = ""; return; }
+    var html = "";
+    for (var si = 0; si < sharedItems.length; si++) {
+      var item = sharedItems[si];
+      html += '<div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;margin-bottom:8px">';
+      html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">';
+      html += '<input type="text" placeholder="Dish name" value="' + esc(item.name) + '" oninput="window.__updateSharedItem(' + si + ',\'name\',this.value)" style="flex:1;padding:6px 8px;font-size:0.85rem">';
+      html += '<input type="number" placeholder="$0.00" value="' + (item.cost > 0 ? item.cost.toFixed(2) : "") + '" min="0" step="0.01" oninput="window.__updateSharedItem(' + si + ',\'cost\',this.value)" style="width:90px;padding:6px 8px;font-size:0.85rem">';
+      html += '<button onclick="window.__removeSharedItem(' + si + ')" style="background:none;border:none;color:var(--danger);font-size:1.1rem;cursor:pointer;padding:0 4px" title="Remove">&times;</button>';
+      html += '</div>';
+      html += '<div style="font-size:0.78rem;color:var(--gray-500);margin-bottom:4px">Split between:</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      for (var m = 0; m < orderMembers.length; m++) {
+        var isSharer = false;
+        for (var ch = 0; ch < item.sharers.length; ch++) {
+          if (item.sharers[ch] === orderMembers[m]) { isSharer = true; break; }
+        }
+        var chipStyle = isSharer
+          ? "background:var(--primary);color:#fff;border-color:var(--primary)"
+          : "background:#fff;color:var(--gray-600);border-color:var(--gray-300)";
+        var prefix = isSharer ? "✓ " : "";
+        html += '<span style="display:inline-block;padding:4px 10px;border-radius:14px;font-size:0.78rem;font-weight:600;cursor:pointer;border:1.5px solid;' + chipStyle + '" onclick="window.__toggleSharer(' + si + ',\'' + esc(orderMembers[m]) + '\')">' + prefix + esc(orderMembers[m]) + '</span>';
+      }
+      if (orderMembers.length === 0) {
+        html += '<span style="font-size:0.78rem;color:var(--gray-400)">Add people in Step 2 first</span>';
+      }
+      html += '</div>';
+      if (item.sharers.length > 0 && item.cost > 0) {
+        var perPerson = Math.round((item.cost / item.sharers.length) * 100) / 100;
+        html += '<div style="margin-top:6px;font-size:0.78rem;color:var(--primary);font-weight:600">$' + perPerson.toFixed(2) + ' each (' + item.sharers.length + ' people)</div>';
+      }
+      html += '</div>';
+    }
+    container.innerHTML = html;
+  }
+
+  // Calculate per-person shared food totals (food cost only, before tax/tip)
+  function getSharedFoodPerPerson() {
+    var totals = {};
+    for (var si = 0; si < sharedItems.length; si++) {
+      var item = sharedItems[si];
+      if (item.cost <= 0 || item.sharers.length === 0) continue;
+      var perPerson = Math.round((item.cost / item.sharers.length) * 100) / 100;
+      for (var sh = 0; sh < item.sharers.length; sh++) {
+        var name = item.sharers[sh];
+        totals[name] = (totals[name] || 0) + perPerson;
+      }
+    }
+    return totals;
+  }
 
   function renderOrders() {
     var container = document.getElementById("orders-list");
@@ -1331,19 +1456,30 @@
     var bulkTips = parseFloat(document.getElementById("bulk-tips").value) || 0;
     var billTotal = bulkTotal + bulkTax + bulkTips;
 
-    // Both tax and tips proportional to each person's food cost
+    // Both tax and tips proportional to each person's food cost (including shared)
     var taxRate = bulkTotal > 0 ? (bulkTax / bulkTotal) : 0;
     var tipRate = bulkTotal > 0 ? (bulkTips / bulkTotal) : 0;
+    var sharedPerPerson = getSharedFoodPerPerson();
 
     var orders = [];
     var total = 0;
     for (var i = 0; i < orderMembers.length; i++) {
-      var food = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
+      var ownFood = parseFloat(document.getElementById("order-cost-" + i).value) || 0;
+      var shared = sharedPerPerson[orderMembers[i]] || 0;
+      var food = ownFood + shared;
       var personTax = Math.round((food * taxRate) * 100) / 100;
       var personTip = Math.round((food * tipRate) * 100) / 100;
       var personTotal = Math.round((food + personTax + personTip) * 100) / 100;
-      orders.push({ name: orderMembers[i], food: food, tax: personTax, tip: personTip, cost: personTotal });
+      orders.push({ name: orderMembers[i], food: food, ownFood: ownFood, sharedFood: shared, tax: personTax, tip: personTip, cost: personTotal });
       total += personTotal;
+    }
+
+    // Save shared items data
+    var sharedItemsData = [];
+    for (var si = 0; si < sharedItems.length; si++) {
+      if (sharedItems[si].cost > 0 && sharedItems[si].sharers.length > 0) {
+        sharedItemsData.push({ name: sharedItems[si].name, cost: sharedItems[si].cost, sharers: sharedItems[si].sharers });
+      }
     }
 
     if (orders.length === 0) { alert("Add at least one person to the order."); return; }
@@ -1357,6 +1493,7 @@
       payer: payer,
       driver: driver,
       orders: orders,
+      sharedItems: sharedItemsData.length > 0 ? sharedItemsData : null,
       total: billTotal > 0 ? billTotal : total,
       tax: bulkTax,
       tips: bulkTips,
@@ -1393,6 +1530,8 @@
           document.getElementById("receipt-preview-img").innerHTML = "";
           document.getElementById("receipt-preview-text").textContent = "📷 Tap to upload receipt photo";
           receiptFile = null;
+          sharedItems = [];
+          renderSharedFood();
           orderMembers = [];
           populateOrdererDropdown();
           document.getElementById("order-total").textContent = "$0.00";
@@ -1490,10 +1629,25 @@
             var pTax = ord.tax !== undefined ? ord.tax : 0;
             var pTip = ord.tip !== undefined ? ord.tip : 0;
             if (pTax > 0 || pTip > 0) {
-              line += '<span style="font-size:0.7rem;color:var(--gray-400);margin-left:2px">($' + pFood.toFixed(2) + ' + $' + pTax.toFixed(2) + ' tax + $' + pTip.toFixed(2) + ' tip)</span>';
+              var foodLabel = '$' + pFood.toFixed(2);
+              // Show shared food breakdown if available
+              if (ord.sharedFood && ord.sharedFood > 0) {
+                var own = ord.ownFood !== undefined ? ord.ownFood : (pFood - ord.sharedFood);
+                foodLabel = '$' + own.toFixed(2) + ' + $' + ord.sharedFood.toFixed(2) + ' shared';
+              }
+              line += '<span style="font-size:0.7rem;color:var(--gray-400);margin-left:2px">(' + foodLabel + ' + $' + pTax.toFixed(2) + ' tax + $' + pTip.toFixed(2) + ' tip)</span>';
             }
           }
           orderParts.push(line);
+        }
+      }
+      // Show shared dishes if any
+      if (l.sharedItems) {
+        var items = Array.isArray(l.sharedItems) ? l.sharedItems : Object.values(l.sharedItems);
+        for (var si = 0; si < items.length; si++) {
+          var sh = items[si];
+          var sharerNames = sh.sharers ? (Array.isArray(sh.sharers) ? sh.sharers : Object.values(sh.sharers)) : [];
+          orderParts.push('<span style="font-size:0.75rem;color:var(--primary)">🍽️ ' + esc(sh.name || "Shared") + ' $' + (sh.cost || 0).toFixed(2) + ' → ' + sharerNames.map(esc).join(", ") + '</span>');
         }
       }
       var payerVenmo = appData.venmo[l.payer] || "";
