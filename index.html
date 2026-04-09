@@ -1306,6 +1306,17 @@
   window.__updateSharedItem = function(idx, field, val) {
     if (field === "name") sharedItems[idx].name = val;
     else if (field === "cost") sharedItems[idx].cost = parseFloat(val) || 0;
+    // Update the per-person split display for this item
+    var splitEl = document.getElementById("shared-split-" + idx);
+    if (splitEl) {
+      var item = sharedItems[idx];
+      if (item.sharers.length > 0 && item.cost > 0) {
+        var pp = Math.round((item.cost / item.sharers.length) * 100) / 100;
+        splitEl.textContent = '$' + pp.toFixed(2) + ' each (' + item.sharers.length + ' people)';
+      } else {
+        splitEl.textContent = '';
+      }
+    }
     window.recalcAll();
   };
 
@@ -1353,10 +1364,13 @@
         html += '<span style="font-size:0.78rem;color:var(--gray-400)">Add people in Step 2 first</span>';
       }
       html += '</div>';
+      // Per-person split display — always render the container, update dynamically
+      var splitText = "";
       if (item.sharers.length > 0 && item.cost > 0) {
         var perPerson = Math.round((item.cost / item.sharers.length) * 100) / 100;
-        html += '<div style="margin-top:6px;font-size:0.78rem;color:var(--primary);font-weight:600">$' + perPerson.toFixed(2) + ' each (' + item.sharers.length + ' people)</div>';
+        splitText = '$' + perPerson.toFixed(2) + ' each (' + item.sharers.length + ' people)';
       }
+      html += '<div id="shared-split-' + si + '" style="margin-top:6px;font-size:0.78rem;color:var(--primary);font-weight:600">' + splitText + '</div>';
       html += '</div>';
     }
     container.innerHTML = html;
